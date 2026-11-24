@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXO · Puebla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="#inicio" data-ir="inicio">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 3"/><circle cx="16" cy="16" r="5" fill="currentColor"/></svg>
+    <span><strong>NEXO</strong><small>Población expuesta · Puebla</small></span>
+  </a>
+  <div class="escenario" role="group" aria-label="Escenario">
+    <label>Fenómeno <select id="fFenomeno"></select></label>
+    <label>Mes <select id="fMes"></select></label>
+  </div>
+  <div id="estadoDatos" class="chips" aria-live="polite"></div>
+</header>
+
+<div class="app">
+  <!-- Barra de herramientas -->
+  <nav class="riel" aria-label="Herramientas">
+    <button data-sec="inicio"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z"/></svg><span>Inicio</span></button>
+    <button data-sec="riesgo"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg><span>Mapa de riesgo</span></button>
+    <button data-sec="contar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg><span>Contar población</span></button>
+    <button data-sec="municipios"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Municipios</span></button>
+    <button data-sec="albergues"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg><span>Albergues sugeridos</span></button>
+    <button data-sec="operacion"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg><span>Operación</span></button>
+    <button data-sec="rutas"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg><span>Rutas</span></button>
+    <button data-sec="sismos"><svg viewBox="0 0 24 24"><path d="M2 12h4l2-5 3 10 3-14 3 9 2-3h3"/></svg><span>Sismos</span></button>
+    <button data-sec="clima"><svg viewBox="0 0 24 24"><path d="M7 17a4 4 0 0 1 0-8 5 5 0 0 1 9.5-1A4 4 0 0 1 17 17zM9 20l-1 2M13 20l-1 2M17 20l-1 2"/></svg><span>Clima</span></button>
+    <button data-sec="ayuda"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg><span>Ayuda</span></button>
+  </nav>
+
+  <!-- Panel de la sección activa -->
+  <main class="panel" id="panel">
+
+    <!-- INICIO -->
+    <section class="sec" data-sec="inicio">
+      <h1>¿Qué quieres hacer?</h1>
+      <p class="intro">NEXO cruza el censo del INEGI con datos de volcán, sismos y clima para saber <strong>cuánta gente hay en riesgo</strong>, <strong>dónde conviene poner albergues</strong> y <strong>cuántas personas faltan por confirmar</strong> en una emergencia.</p>
+      <div class="tarjetas">
+        <button class="tarjeta" data-ir="riesgo"><b>Ver el riesgo en Puebla</b><span>Mapa con semáforo por localidad según el fenómeno y el mes.</span></button>
+        <button class="tarjeta" data-ir="contar"><b>Contar personas en una zona</b><span>Dibuja un círculo o polígono y obtén población y grupos vulnerables.</span></button>
+        <button class="tarjeta" data-ir="municipios"><b>Revisar un municipio</b><span>Tablero con ranking estatal y ficha de cada municipio.</span></button>
+        <button class="tarjeta" data-ir="albergues"><b>Proponer albergues</b><span>Ubicaciones estratégicas fuera de peligro que cubren a más gente.</span></button>
+        <button class="tarjeta" data-ir="operacion"><b>Registrar albergues y bases</b><span>Personas a salvo, capacidad y necesidades. Expuestos vs. confirmados.</span></button>
+        <button class="tarjeta" data-ir="rutas"><b>Trazar una ruta de atención</b><span>De la base más cercana a la emergencia, o de la emergencia al albergue.</span></button>
+      </div>
+      <h2>Estado de los datos</h2>
+      <ul id="checklist" class="checklist"></ul>
+      <h2>Primeros pasos</h2>
+      <ol class="pasos">
+        <li>Arriba elige el <b>fenómeno</b> y el <b>mes</b>: todo NEXO se recalcula con ese escenario.</li>
+        <li>Usa la barra de herramientas (a la izquierda; arriba en el celular) para cambiar de sección.</li>
+        <li>Cada herramienta te dice qué hacer en el recuadro “Cómo se usa”.</li>
+      </ol>
+      <p class="nota">Página pública para la población: <a href="cerca.html" target="_blank" rel="noopener">albergue más cercano (funciona sin internet)</a>.</p>
+    </section>
+
+    <!-- MAPA DE RIESGO -->
+    <section class="sec" data-sec="riesgo" hidden>
+      <h1>Mapa de riesgo</h1>
+      <div class="como"><b>Cómo se usa</b> Elige fenómeno y mes arriba. Cada punto es una localidad, del color de su nivel de riesgo; su tamaño indica la población. Da clic en un punto para ver su detalle.</div>
+      <div id="rKpis" class="kpis"></div>
+      <h2>Población por nivel de riesgo</h2>
+      <div id="rNivelesEst"></div>
+      <h2>Mostrar en el mapa</h2>
+      <label>Municipio <select id="fMun"><option value="">Todos</option></select></label>
+      <fieldset><legend>Niveles</legend><div id="fNiveles" class="checks"></div></fieldset>
+      <label>Población mínima por localidad <input id="fPobMin" type="number" min="0" step="50" value="0" inputmode="numeric"></label>
+      <fieldset><legend>Capas</legend><div class="checks">
+        <label><input type="checkbox" id="capaPopo" checked>Radio de 12 km del Popocatépetl</label>
+        <label><input type="checkbox" id="capaPuntos" checked>Albergues y bases registrados</label>
+      </div></fieldset>
+      <p class="nota" id="notaMes"></p>
+    </section>
+
+    <!-- CONTAR -->
+    <section class="sec" data-sec="contar" hidden>
+      <h1>Contar población en una zona</h1>
+      <div class="como"><b>Cómo se usa</b> 1) Elige círculo o polígono. 2) Da clic en el mapa (centro del círculo, o vértices del polígono). 3) Lee los resultados abajo. También puedes usar una zona rápida.</div>
+      <div class="segmento" role="group" aria-label="Tipo de zona">
+        <button type="button" id="mCirculo" class="activo">Círculo</button>
+        <button type="button" id="mPoligono">Polígono</button>
+      </div>
+      <div id="opCirculo"><label>Radio: <output id="radioTxt">12</output> km <input id="radio" type="range" min="1" max="150" value="12"></label></div>
+      <div id="opPoligono" hidden>
+        <p class="nota">Vértices: <span id="nVert">0</span></p>
+        <div class="fila"><button type="button" id="btnDeshacer">Deshacer vértice</button><button type="button" id="btnCerrar" class="primario">Cerrar y contar</button></div>
+      </div>
+      <h2>Zonas rápidas</h2>
+      <div class="pilas">
+        <button type="button" data-preset="popo12">Popocatépetl 12 km</button>
+        <button type="button" data-preset="popo30">Popocatépetl 30 km</button>
+        <button type="button" data-preset="ceniza">Ceniza según viento (24 h)</button>
+        <button type="button" data-preset="estado">Todo el estado</button>
+      </div>
+      <p id="infoCeniza" class="nota"></p>
+      <button type="button" id="btnLimpiar" class="ancho100">Limpiar zona</button>
+      <div id="resVacio" class="vacio">Todavía no hay zona. Da clic en el mapa o elige una zona rápida.</div>
+      <div id="resPob" hidden>
+        <p class="cifra"><span id="rTotal">0</span><small>personas viven en la zona</small></p>
+        <p id="rSub" class="nota"></p>
+        <h2>Grupos vulnerables</h2><div id="rGrupos" class="barras"></div>
+        <h2>Viviendas</h2><div id="rViv" class="barras"></div>
+        <p id="rReservado" class="nota"></p>
+        <h2>Por nivel de riesgo</h2><div id="rNiveles"></div>
+        <h2>Municipios</h2>
+        <div class="scroll"><table id="rMun"><thead><tr><th>Municipio</th><th class="n">Localidades</th><th class="n">Población</th></tr></thead><tbody></tbody></table></div>
+        <h2>Localidades prioritarias</h2>
+        <div class="scroll"><table id="rLoc" class="stack"><thead><tr><th>Localidad</th><th>Municipio</th><th class="n">Población</th><th class="n">0–2 / 60+</th><th>Riesgo</th></tr></thead><tbody></tbody></table></div>
+        <div class="fila"><button type="button" id="btnCSV">Descargar CSV</button><button type="button" data-ir="operacion">Ver operación en esta zona</button></div>
+        <p id="rNota" class="nota"></p>
+      </div>
+    </section>
+
+    <!-- MUNICIPIOS -->
+    <section class="sec" data-sec="municipios" hidden>
+      <div id="munLista">
+        <h1>Tablero de municipios</h1>
+        <div class="como"><b>Cómo se usa</b> Ordena la tabla por la columna que te interese o busca un municipio. Da clic en un renglón para abrir su ficha.</div>
+        <div id="mKpis" class="kpis k3"></div>
+        <div id="mNiveles"></div>
+        <div class="fila">
+          <label>Buscar <input id="mBuscar" type="search" placeholder="Nombre del municipio"></label>
+          <label>Ordenar por <select id="mOrden">
+            <option value="riesgo">Índice de riesgo</option>
+            <option value="pctRiesgoAlto">% en riesgo alto o muy alto</option>
+            <option value="poblacion">Población</option>
+            <option value="vulnerabilidad">Vulnerabilidad</option>
+            <option value="P_60YMAS">Personas de 60 y más</option>
+            <option value="P_0A2">Bebés de 0 a 2</option>
+            <option value="PCON_DISC">Con discapacidad</option>
+          </select></label>
+        </div>
+        <h2 id="mTopTitulo">Los 10 primeros</h2>
+        <div id="mTop" class="barras"></div>
+        <div class="scroll alto"><table id="mTabla" class="stack"><thead><tr><th>Municipio</th><th class="n">Población</th><th class="n">% alto</th><th class="n">Vuln.</th><th class="n">60+</th><th>Riesgo</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div id="munFicha" hidden>
+        <button type="button" id="mVolver" class="volver">← Todos los municipios</button>
+        <div id="fichaCont"></div>
+      </div>
+    </section>
+
+    <!-- ALBERGUES SUGERIDOS -->
+    <section class="sec" data-sec="albergues" hidden>
+      <h1>Albergues estratégicos</h1>
+      <div class="como"><b>Cómo se usa</b> NEXO busca localidades <b>fuera de la zona de peligro</b> del fenómeno elegido que, a la distancia que indiques, <b>cubren a la mayor cantidad de personas en riesgo</b>, dando más peso a grupos vulnerables. Ajusta los valores y presiona “Proponer”.</div>
+      <form id="formAlb" class="form">
+        <div class="fila">
+          <label>Número de albergues <input name="k" type="number" min="1" max="40" value="8"></label>
+          <label>Distancia máxima (km) <input name="radioKm" type="number" min="2" max="100" value="25"></label>
+        </div>
+        <div class="fila">
+          <label>Habitantes mínimos de la sede <input name="pobMinCandidato" type="number" min="0" step="500" value="2500"></label>
+          <label>% que usaría albergue <input name="porcentajeAlbergue" type="number" min="1" max="100" value="15"></label>
+        </div>
+        <label>Municipio (opcional) <select name="mun" id="aMun"><option value="">Todo el estado</option></select></label>
+        <fieldset><legend>Cubrir población en riesgo</legend><div class="checks">
+          <label><input type="checkbox" name="niv" value="muy_alto" checked>Muy alto</label>
+          <label><input type="checkbox" name="niv" value="alto" checked>Alto</label>
+          <label><input type="checkbox" name="niv" value="medio">Medio</label>
+        </div></fieldset>
+        <button type="submit" class="primario ancho100">Proponer ubicaciones</button>
+      </form>
+      <div id="aRes"></div>
+    </section>
+
+    <!-- OPERACIÓN -->
+    <section class="sec" data-sec="operacion" hidden>
+      <h1>Operación en emergencia</h1>
+      <div class="como"><b>Cómo se usa</b> Registra albergues (personas a salvo y necesidades) y bases de respuesta (Protección Civil, Cruz Roja, hospitales). Si dibujaste una zona en “Contar población”, aquí ves expuestos vs. confirmados.</div>
+      <div class="tres">
+        <div><span id="oExp">–</span><small>Expuestos (censo)</small></div>
+        <div class="ok"><span id="oConf">–</span><small>Confirmados a salvo</small></div>
+        <div class="alerta"><span id="oSin">–</span><small>Sin confirmar</small></div>
+      </div>
+      <div class="progreso" aria-hidden="true"><i id="oBarra"></i></div>
+      <p id="oNec" class="nota">Dibuja una zona en “Contar población” para ver estas cifras.</p>
+      <details class="caja" open>
+        <summary>Registrar punto</summary>
+        <form id="formConf" class="form">
+          <div class="fila">
+            <label>Tipo<select name="tipo"><option value="albergue">Albergue</option><option value="base">Base de respuesta (ambulancias, Protección Civil)</option><option value="reporte">Reporte de brigada</option></select></label>
+            <label>Fuente<select name="fuente"><option value="web">Web</option><option value="brigada">Brigada</option><option value="lora">ESP32 / LoRa (simulado)</option></select></label>
+          </div>
+          <label>Nombre<input name="nombre" maxlength="80" required placeholder="Albergue Primaria Benito Juárez"></label>
+          <div class="fila">
+            <label>Personas a salvo<input name="personas" type="number" min="0" value="0" required inputmode="numeric"></label>
+            <label>Capacidad<input name="capacidad" type="number" min="0" inputmode="numeric"></label>
+          </div>
+          <div class="fila">
+            <label>Latitud<input name="lat" type="number" step="any" required></label>
+            <label>Longitud<input name="lon" type="number" step="any" required></label>
+          </div>
+          <button type="button" id="btnUbicar">Elegir ubicación en el mapa</button>
+          <fieldset><legend>Necesidades</legend><div id="cNec" class="checks"></div></fieldset>
+          <label>Nota<input name="nota" maxlength="240"></label>
+          <button type="submit" class="primario">Guardar</button>
+          <p id="formMsg" class="nota" aria-live="polite"></p>
+        </form>
+      </details>
+      <h2>Puntos registrados</h2>
+      <div class="segmento chico" role="group"><button type="button" data-filtro="todos" class="activo">Todos</button><button type="button" data-filtro="albergue">Albergues</button><button type="button" data-filtro="base">Bases</button><button type="button" data-filtro="reporte">Reportes</button></div>
+      <ul id="listaConf" class="lista"></ul>
+      <p class="nota">Se guardan conteos por albergue, no datos personales. Los nodos ESP32 envían estos mismos registros (ver docs/propuesta-lora.md).</p>
+    </section>
+
+    <!-- RUTAS -->
+    <section class="sec" data-sec="rutas" hidden>
+      <h1>Ruta de atención</h1>
+      <div class="como"><b>Cómo se usa</b> 1) Marca la <b>emergencia</b> en el mapa. 2) Elige de dónde sale la ayuda (base más cercana, una base registrada o un punto en el mapa). 3) Calcula. También puedes llevar a la gente al albergue más cercano.</div>
+      <div class="ruta-paso">
+        <b>1. Emergencia (destino)</b>
+        <p id="rtDestinoTxt" class="nota">Sin marcar.</p>
+        <button type="button" id="rtMarcarDestino" class="primario">Marcar en el mapa</button>
+      </div>
+      <div class="ruta-paso">
+        <b>2. Sale la ayuda desde (origen)</b>
+        <p id="rtOrigenTxt" class="nota">Sin elegir.</p>
+        <div class="fila">
+          <button type="button" id="rtBaseCercana">Base más cercana</button>
+          <button type="button" id="rtMarcarOrigen">Marcar en el mapa</button>
+        </div>
+        <label>O elige una base registrada <select id="rtBases"><option value="">—</option></select></label>
+      </div>
+      <div class="fila">
+        <button type="button" id="rtCalcular" class="primario">Calcular ruta</button>
+        <button type="button" id="rtAlbergue">Llevar al albergue más cercano</button>
+      </div>
+      <div id="rtRes"></div>
+      <details class="caja"><summary>¿Con qué se calcula la ruta?</summary>
+        <p class="nota">Si el servidor tiene la variable <code>GOOGLE_MAPS_API_KEY</code>, usa Google Maps (Routes API) con tráfico. Si no, usa OpenStreetMap con OSRM (servidor de demostración, solo para prototipo). Sin internet, estima en línea recta. Ninguno sabe qué calles cerró el desastre: confirmen con las brigadas.</p>
+      </details>
+    </section>
+
+    <!-- SISMOS -->
+    <section class="sec" data-sec="sismos" hidden>
+      <h1>Historial sísmico</h1>
+      <div class="como"><b>Cómo se usa</b> Da clic en el mapa para elegir el centro (o usa el de tu zona) y presiona “Analizar”. Son frecuencias históricas: los sismos no se pueden predecir.</div>
+      <p id="sCentro" class="nota"></p>
+      <div class="fila">
+        <label>Radio (km)<input id="sRadio" type="number" min="10" max="300" value="100"></label>
+        <label>Magnitud mínima<input id="sMag" type="number" min="4.5" max="7" step="0.1" value="4.5"></label>
+      </div>
+      <button type="button" id="btnSismos" class="primario ancho100">Analizar</button>
+      <div id="sRes"></div>
+    </section>
+
+    <!-- CLIMA -->
+    <section class="sec" data-sec="clima" hidden>
+      <h1>Clima y temporada</h1>
+      <div class="como"><b>Cómo se usa</b> Da clic en el mapa para elegir un punto (o usa el centro de tu zona) y presiona “Consultar”.</div>
+      <p id="cCentro" class="nota"></p>
+      <button type="button" id="btnClima" class="primario ancho100">Consultar</button>
+      <div id="cRes"></div>
+    </section>
+
+    <!-- AYUDA -->
+    <section class="sec" data-sec="ayuda" hidden>
+      <h1>Ayuda y método</h1>
+      <details class="caja" open><summary>¿De dónde salen los datos?</summary>
+        <p><b>Población:</b> ITER 2020 del INEGI (población por localidad). <b>Sismos:</b> catálogo USGS desde 1980. <b>Clima:</b> Open-Meteo (pronóstico y reanálisis ERA5). <b>Viento en altura:</b> Open-Meteo a 500 hPa. <b>Rutas:</b> Google Maps u OpenStreetMap/OSRM.</p></details>
+      <details class="caja"><summary>¿Cómo se calcula el riesgo?</summary>
+        <p><b>Vulnerabilidad (0–1):</b> promedio de rangos percentiles de seis indicadores del censo (0–2 y 60+ años, discapacidad, sin servicios de salud, piso de tierra, sin electricidad, sin agua entubada).</p>
+        <p><b>Peligro (0–1):</b> volcánico por distancia al cráter (≤12, 30, 60, 100 km); sísmico por densidad histórica de sismos M≥4.5 a 75 km; lluvias y heladas por la climatología del mes.</p>
+        <p><b>Riesgo = Peligro × (0.5 + 0.5 × Vulnerabilidad).</b> Niveles: bajo &lt;0.2, medio &lt;0.4, alto &lt;0.6, muy alto ≥0.6. Es un índice relativo para priorizar, no el Atlas Nacional de Riesgos.</p></details>
+      <details class="caja"><summary>¿Cómo se proponen los albergues?</summary>
+        <p>Modelo de cobertura máxima: se eligen, una por una, las localidades con peligro bajo (≤0.4) y suficientes habitantes que alcanzan, dentro de la distancia indicada, a más personas en riesgo, ponderadas por vulnerabilidad. La capacidad sugerida es la población cubierta por el porcentaje que usaría albergue. Hay que verificar en campo el inmueble, su estructura y los accesos.</p></details>
+      <details class="caja"><summary>Limitaciones</summary>
+        <ul><li>El censo cuenta dónde vive la gente, no dónde está a cada hora, y es de 2020.</li><li>Las localidades pequeñas tienen datos reservados por el INEGI: los conteos de grupos son un mínimo.</li><li>Los sismos no se predicen: se muestran frecuencias históricas.</li><li>Las rutas no conocen los cierres causados por el desastre.</li></ul></details>
+      <details class="caja"><summary>Glosario</summary>
+        <p><b>Geocerca:</b> zona dibujada en el mapa. <b>Expuestos:</b> población del censo dentro de la zona. <b>Confirmados:</b> personas registradas en albergues dentro de la zona. <b>Base:</b> punto de donde sale la ayuda. <b>Valor b:</b> pendiente de la ley de Gutenberg-Richter; indica la proporción de sismos grandes y pequeños.</p></details>
+    </section>
+  </main>
+
+  <!-- Mapa -->
+  <section class="mapaCaja" aria-label="Mapa">
+    <div id="mapa"></div>
+    <div id="pista" class="pista" hidden></div>
+    <div id="leyenda" class="leyenda"></div>
+    <div id="sinDatos" class="aviso" hidden>
+      <h2>Falta cargar el censo</h2>
+      <p>Descarga el CSV del ITER 2020 de Puebla y cópialo en <code>data/iter/</code>, luego presiona Recargar.</p>
+      <ol>
+        <li>Abre <a href="https://www.inegi.org.mx/app/scitel/default?ev=9" target="_blank" rel="noopener">SCITEL del INEGI (Censo 2020)</a>.</li>
+        <li>En la fila <strong>Puebla</strong> da clic en <strong>CSV</strong>.</li>
+        <li>Guárdalo como <code>data/iter/iter_puebla_2020.csv</code>.</li>
+      </ol>
+      <button type="button" id="btnRecargar" class="primario">Recargar</button>
+    </div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="app.js"></script>
+</body>
+</html>
