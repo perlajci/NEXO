@@ -1,0 +1,9 @@
+ENTIDAD,NOM_ENT,MUN,NOM_MUN,LOC,NOM_LOC,LONGITUD,LATITUD,ALTITUD,POBTOT,POBFEM,POBMAS,P_0A2,P_60YMAS,PCON_DISC,P3YM_HLI,PSINDER,TVIVHAB,VPH_PISOTI,VPH_S_ELEC,VPH_AGUAFV
+21,Puebla,000,Total de la Entidad Puebla,0000,Total de la Entidad,,,,999999,1,1,1,1,1,1,1,1,1,1,1
+21,Puebla,001,Municipio A,0000,Total del Municipio,,,,5000,1,1,1,1,1,1,1,1,1,1,1
+21,Puebla,001,Municipio A,0001,"Localidad Uno, Centro","98°37'00.000"" W","19°04'00.000"" N",2400,1000,520,480,40,120,50,10,300,250,20,1,30
+21,Puebla,001,Municipio A,0002,Localidad Dos,"98°20'00.000"" W","19°10'00.000"" N",2200,500,260,240,15,60,25,200,120,130,5,0,10
+21,Puebla,002,Municipio B,0001,Localidad Tres,"97°30'00.000"" W","18°30'00.000"" N",1500,300,150,150,9,30,12,0,40,70,2,0,5
+21,Puebla,002,Municipio B,0002,Localidad Reservada,"98°36'30.000"" W","19°03'30.000"" N",2450,8,*,*,*,*,*,*,*,2,*,*,*
+21,Puebla,002,Municipio B,0003,Sin coordenadas,,,,77,40,37,1,1,1,1,1,20,1,1,1
+21,Puebla,002,Municipio B,9998,Localidades de una vivienda,,,,15,8,7,*,*,*,*,*,5,*,*,*

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e5a7a">
+<title>Albergue más cercano · NEXO</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+  /* Página pública: una sola tarea, letra grande, funciona sin internet una vez abierta. */
+  :root{color-scheme:light dark;--bg:light-dark(#f4f7f9,#0d151d);--card:light-dark(#fff,#15212c);--ink:light-dark(#14212b,#e6edf3);--muted:light-dark(#566876,#9fb0bf);--line:light-dark(#dbe2e8,#2a3947);--accent:light-dark(#0e5a7a,#5cc3e8);--ok:#2f8f5b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,sans-serif}
+  header{background:var(--accent);color:light-dark(#fff,#06202c);padding:18px 18px 22px}
+  header h1{margin:0;font-size:26px;line-height:1.15}header p{margin:6px 0 0;opacity:.9;font-size:15px}
+  main{max-width:560px;margin:0 auto;padding:16px}
+  button{font:inherit;font-weight:700;width:100%;min-height:56px;border-radius:12px;border:0;background:var(--accent);color:light-dark(#fff,#06202c);font-size:18px;cursor:pointer}
+  button:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+  .estado{color:var(--muted);font-size:14px;margin:10px 0}
+  .alb{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:center}
+  .flecha{width:64px;height:64px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;grid-row:span 3}
+  .flecha svg{width:34px;height:34px;transition:transform .3s}
+  .alb h2{margin:0;font-size:19px;line-height:1.2}
+  .dist{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+  .dist small{font-size:15px;font-weight:600;color:var(--muted)}
+  .lugares{font-size:14px;color:var(--muted)}.lugares b{color:var(--ok)}
+  .alb a{grid-column:1/-1;font-size:15px;color:var(--accent)}
+  .aviso{background:var(--card);border-left:5px solid #e0ad2f;border-radius:10px;padding:12px 14px;font-size:15px;margin:14px 0}
+  @media (prefers-reduced-motion:reduce){.flecha svg{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>¿Cuál es mi albergue más cercano?</h1>
+  <p>Funciona sin internet: usa el GPS de tu teléfono y la lista guardada.</p>
+</header>
+<main>
+  <button type="button" id="btnGPS">Buscar con mi ubicación</button>
+  <p class="estado" id="estado">Cargando la lista de albergues…</p>
+  <div id="lista"></div>
+  <div class="aviso"><b>Importante:</b> sigue siempre las indicaciones de Protección Civil. La flecha apunta en línea recta; camina por calles seguras y aléjate de ríos, laderas y del volcán. En emergencia llama al <b>911</b>.</div>
+  <p class="estado">Abre esta página al menos una vez con internet para guardarla. Después funciona sin conexión.</p>
+</main>
+<script>
+{
+  const CLAVE = 'nexo_albergues_v1';
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const rad = (d) => (d * Math.PI) / 180;
+  const distKm = (a, b, c, d) => { const x = Math.sin(rad(c - a) / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(rad(d - b) / 2) ** 2; return 12742 * Math.asin(Math.sqrt(x)); };
+  const rumbo = (a, b, c, d) => { const y = Math.sin(rad(d - b)) * Math.cos(rad(c)); const x = Math.cos(rad(a)) * Math.sin(rad(c)) - Math.sin(rad(a)) * Math.cos(rad(c)) * Math.cos(rad(d - b)); return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360; };
+  const PUNTOS = ['norte', 'noreste', 'este', 'sureste', 'sur', 'suroeste', 'oeste', 'noroeste'];
+  const nombreRumbo = (g) => PUNTOS[Math.round(g / 45) % 8];
+  let datos = null;
+
+  function guardado() { try { return JSON.parse(localStorage.getItem(CLAVE)); } catch { return null; } }
+  async function cargar() {
+    try {
+      const r = await fetch('/api/albergues/publicos', { cache: 'no-store' });
+      if (!r.ok) throw new Error();
+      datos = await r.json();
+      try { localStorage.setItem(CLAVE, JSON.stringify(datos)); } catch { /* sin almacenamiento */ }
+      $('#estado').textContent = `Lista actualizada: ${datos.albergues.length} albergues.`;
+    } catch {
+      datos = guardado();
+      $('#estado').textContent = datos
+        ? `Sin internet. Usando la lista guardada el ${new Date(datos.actualizado).toLocaleString('es-MX')} (${datos.albergues.length} albergues).`
+        : 'Sin internet y sin lista guardada. Abre esta página con internet al menos una vez.';
+    }
+  }
+  function mostrar(lat, lon) {
+    if (!datos || !datos.albergues.length) { $('#lista').innerHTML = '<p class="estado">No hay albergues registrados.</p>'; return; }
+    const lista = datos.albergues.map((a) => ({ ...a, d: distKm(lat, lon, a.lat, a.lon), g: rumbo(lat, lon, a.lat, a.lon) })).sort((x, y) => x.d - y.d).slice(0, 5);
+    $('#lista').innerHTML = lista.map((a) => {
+      const libres = a.capacidad ? Math.max(0, a.capacidad - (a.personas || 0)) : null;
+      const dist = a.d < 1 ? `${Math.round(a.d * 1000)} <small>m</small>` : `${a.d.toFixed(1)} <small>km</small>`;
+      return `<div class="alb">
+        <div class="flecha" aria-hidden="true"><svg viewBox="0 0 24 24" style="transform:rotate(${a.g.toFixed(0)}deg)"><path d="M12 2l6 14-6-3-6 3z" fill="currentColor"/></svg></div>
+        <h2>${esc(a.nombre)}</h2>
+        <div class="dist">${dist} <small>al ${nombreRumbo(a.g)}</small></div>
+        <div class="lugares">${libres === null ? 'Capacidad sin dato' : `<b>${libres}</b> lugares libres de ${a.capacidad}`}</div>
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lon}&travelmode=walking" target="_blank" rel="noopener">Abrir indicaciones (requiere internet)</a>
+      </div>`;
+    }).join('');
+  }
+  $('#btnGPS').addEventListener('click', () => {
+    if (!('geolocation' in navigator)) { $('#estado').textContent = 'Tu teléfono no permite usar la ubicación.'; return; }
+    $('#estado').textContent = 'Buscando tu ubicación… sin internet el GPS puede tardar hasta un minuto.';
+    navigator.geolocation.getCurrentPosition(
+      (p) => { $('#estado').textContent = `Tu ubicación: ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)} (±${Math.round(p.coords.accuracy)} m).`; mostrar(p.coords.latitude, p.coords.longitude); },
+      (e) => { $('#estado').textContent = e.code === 1 ? 'Permite el acceso a la ubicación para buscar tu albergue.' : 'No se pudo obtener la ubicación. Sal a un lugar abierto y vuelve a intentar.'; },
+      { enableHighAccuracy: true, timeout: 60000, maximumAge: 120000 },
+    );
+  });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  cargar();
+}
+</script>
+</body>
+</html>

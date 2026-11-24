@@ -1,0 +1,15 @@
+{
+  "name": "nexo-web",
+  "version": "0.2.0",
+  "description": "NEXO: población expuesta y grupos vulnerables ante fenómenos naturales en Puebla (HackaTec 2026, reto HackaHer SECIHTI)",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "preparar": "node scripts/preparar-datos.js",
+    "test": "node --test test/*.test.js",
+    "lora:simular": "node scripts/simular-lora.js"
+  },
+  "license": "MIT"
+}
