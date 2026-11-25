@@ -132,6 +132,49 @@ Desde el historial se puede **restaurar** una versión, también con clave y con
 
 Todavía no existe. Cuando lo agregues, con al menos la columna `cct` y de preferencia `nombre`, `municipio`, `localidad`, `lat` y `lon` (UTF-8, una escuela por renglón), cada presupuesto con CCT se enlaza solo con su plantel en el campo `plantel`. No hay que reiniciar ni cambiar código: lo leen `cargarPlanteles` y `buscarPlantel` en `lib/presupuesto.js`.
 
+## Escuelas (`data/escuelas/*.csv`)
+
+Copia en `data/escuelas/` uno o varios CSV de escuelas de Puebla. PIANI reconoce dos fuentes públicas:
+
+- **Catálogo de Centros de Trabajo (CCT) de la SEP:** trae la clave CCT y, a veces, el número de alumnos.
+- **DENUE del INEGI**, actividades `6111`, `6112` y `6113` (escuelas). No trae CCT ni alumnos: esos campos quedan vacíos y la escuela se identifica como `DENUE-<id>`. **PIANI nunca inventa una CCT.**
+
+Revisa el archivo sin arrancar el servidor con `npm run escuelas:revisar`: dice cuántas escuelas se leyeron, cuántas se descartaron por cada motivo, qué columnas se reconocieron y si trae latitud y longitud. Un CSV nuevo se lee sin reiniciar; sin archivo, Inicio muestra un aviso y el servidor sigue funcionando.
+
+Cada escuela queda con: `cct`, `nombre`, `nivel`, `sostenimiento`, `municipio`, `localidad`, `lat`, `lon`, `alumnos` (vacío si no viene), `turnos`, `fuente` y `decimales_coord`.
+
+**Columnas que se reconocen** (sin importar mayúsculas, acentos ni guiones bajos):
+
+| Campo | Nombres aceptados |
+|---|---|
+| Entidad | `cve_ent`, `cv_ent`, `clave_entidad`, `cve_entidad`, `id_entidad`, `entidad` (número o “Puebla”) |
+| CCT | `cct`, `clave_ct`, `clave_cct`, `cv_cct`, `cve_cct`, `clave_centro_trabajo` (obligatoria en la SEP) |
+| Nombre | `nombre`, `nombre_ct`, `nombre_escuela`, `c_nombre`, `nom_estab` |
+| Nivel | `nivel`, `nivel_educativo`, `c_nivel`, `nombre_nivel` (en el DENUE sale de `nombre_act`) |
+| Sostenimiento | `sostenimiento`, `c_sostenimiento`, `tipo_sostenimiento`, `control` (en el DENUE sale de `nombre_act`) |
+| Turno | `turno`, `c_turno`, `nombre_turno` |
+| Municipio / localidad | `municipio`, `nombre_municipio`, `nom_mun`, `c_nom_mun` / `localidad`, `nombre_localidad`, `nom_loc`, `c_nom_loc` |
+| Coordenadas | `latitud` o `lat`, `longitud` o `lon` (decimal o grados-minutos-segundos) |
+| Alumnos | `alumnos`, `total_alumnos`, `matricula` |
+
+**Filtros, en este orden** (cada descarte se cuenta aparte, con su renglón y motivo):
+
+1. **Clave de entidad = 21.** Si el archivo no trae la columna, se usa el inicio de la CCT (`21` = Puebla).
+2. **CCT con el formato de Puebla** (`21` + 3 letras + 4 dígitos + letra), solo en la SEP.
+3. **Coordenadas presentes.**
+4. **Revisión extra:** escuelas con entidad 21 cuya coordenada cae fuera del rectángulo que contiene al estado (latitud 17.8 a 20.9, longitud −99.1 a −96.7). Se descartan porque la coordenada está mal.
+5. **DENUE:** se descartan las actividades que no son escuelas.
+
+**Una escuela por CCT.** El catálogo de la SEP repite la CCT en un renglón por turno: PIANI deja un solo registro, **suma los alumnos de todos los turnos** y guarda la lista en `turnos`. Si un turno trae alumnos y otro no, la suma es un mínimo y se marca `alumnos_incompleto`. Un renglón con la misma CCT y el mismo turno se cuenta como repetido y no se suma.
+
+**`decimales_coord`** dice qué tan fino está **escrita** la coordenada en el archivo, no si la escuela está realmente en ese punto:
+
+| Valor | Decimales (de la menos fina entre latitud y longitud) | Equivale a |
+|---|---|---|
+| `alta` | 4 o más (o segundos con decimales) | ≈ 11 m o mejor |
+| `media` | 3 (o segundos enteros) | ≈ 110 m |
+| `baja` | 2 o menos | ≈ 1 km o más |
+
 ## ESP32 y LoRa
 
 - `firmware/nodo-albergue/`: ESP32 con botones +1/−1/enviar. `MODO_WIFI` manda la trama directo a NEXO (se puede simular en Wokwi); `MODO_LORA` la manda por radio a 915 MHz.
@@ -144,7 +187,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 68 pruebas (7 del inicio de sesión en `test/sesion.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv` y `test/fixture/capcee/tabulador_prueba.csv`, con **cifras y precios inventados** solo para probar el código.
+`npm test` corre 76 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 8 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 

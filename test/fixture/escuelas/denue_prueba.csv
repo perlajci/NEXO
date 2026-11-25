@@ -1,4 +1,5 @@
-id,nom_estab,raz_social,codigo_act,nombre_act,per_ocu,municipio,localidad,latitud,longitud
-900001,ESCUELA PRIMARIA DE PRUEBA (DATO INVENTADO),,611122,Escuelas de educación primaria del sector público,11 a 30 personas,Municipio A,Localidad Uno,19.0412,-98.2062
-900002,JARDIN DE NIÑOS DE PRUEBA (DATO INVENTADO),,611111,Escuelas de educación preescolar del sector privado,0 a 5 personas,Municipio B,Localidad Tres,18.501,-97.502
-900003,TIENDA DE PRUEBA (DATO INVENTADO),,461110,Comercio al por menor en tiendas de abarrotes,0 a 5 personas,Municipio A,Localidad Uno,19.04,-98.2
+id,nom_estab,raz_social,codigo_act,nombre_act,per_ocu,cve_ent,entidad,municipio,localidad,latitud,longitud
+900001,ESCUELA PRIMARIA DE PRUEBA (DATO INVENTADO),,611122,Escuelas de educación primaria del sector público,11 a 30 personas,21,Puebla,Municipio A,Localidad Uno,19.0412,-98.2062
+900002,JARDIN DE NIÑOS DE PRUEBA (DATO INVENTADO),,611111,Escuelas de educación preescolar del sector privado,0 a 5 personas,21,Puebla,Municipio B,Localidad Tres,18.501,-97.502
+900003,TIENDA DE PRUEBA (DATO INVENTADO),,461110,Comercio al por menor en tiendas de abarrotes,0 a 5 personas,21,Puebla,Municipio A,Localidad Uno,19.04,-98.2
+900004,ESCUELA DE PRUEBA EN OTRA ENTIDAD (DATO INVENTADO),,611122,Escuelas de educación primaria del sector público,0 a 5 personas,29,Tlaxcala,Otro municipio,Otra localidad,19.3,-98.2
