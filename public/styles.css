@@ -37,8 +37,9 @@ a{color:var(--accent)}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#2a9d63;box-shadow:0 0 0 3px rgba(42,157,99,.15);flex:none}
 .chip.mal{background:#fff1f1;border-color:#f6caca;color:#8f1218}.chip.mal::before{background:#d12b33;box-shadow:0 0 0 3px rgba(209,43,51,.15)}
 .chip button{margin-left:4px;font:700 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;min-height:0;padding:5px 10px;border-radius:99px;background:#0b2a55;color:#fff;border:0}
-.app{flex:1;display:grid;grid-template-columns:88px 420px minmax(0,1fr);min-height:0}
-body.ancho .app{grid-template-columns:88px minmax(0,58%) minmax(0,1fr)}
+/* El ancho del panel se ajusta arrastrando el divisor (--ancho-panel y, en Municipios y Tabulador, --ancho-panel-amplio). */
+.app{flex:1;display:grid;grid-template-columns:88px var(--ancho-panel,420px) minmax(0,1fr);min-height:0}
+body.ancho .app{grid-template-columns:88px var(--ancho-panel-amplio,minmax(0,58%)) minmax(0,1fr)}
 .riel{background:var(--riel);display:flex;flex-direction:column;padding:6px 0;overflow-y:auto}
 .riel button{all:unset;position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;color:var(--rielInk);font-size:11.5px;line-height:1.15;text-align:center;border-left:3px solid transparent;transition:background-color .15s}
 .riel .conteo{position:absolute;top:5px;right:8px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#e3742b;color:#fff;font-style:normal;font-size:11px;font-weight:800;line-height:19px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35)}
@@ -99,6 +100,14 @@ fieldset{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:6px
 .checklist .si{color:var(--ok);font-weight:700}.checklist .no{color:var(--warn);font-weight:700}
 
 .mapaCaja{position:relative;min-height:0}#mapa{position:absolute;inset:0}
+/* Divisor entre el panel y el mapa: se arrastra con el mouse o el dedo, o se mueve con las flechas. */
+.divisor{position:absolute;top:0;bottom:0;left:-6px;width:12px;z-index:900;cursor:col-resize;touch-action:none;display:flex;align-items:center;justify-content:center}
+.divisor::before{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;background:transparent;transition:background-color .15s}
+.divisor:hover::before,.divisor:focus-visible::before,body.arrastrando .divisor::before{background:var(--turquesa,#19c3cf)}
+.divisor span{position:relative;width:8px;height:44px;border-radius:99px;background:var(--panel);border:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.25);display:grid;place-items:center}
+.divisor span::after{content:"";width:2px;height:18px;border-left:2px dotted var(--muted)}
+.divisor:focus-visible{outline:none}.divisor:focus-visible span{outline:3px solid var(--accent);outline-offset:2px}
+body.arrastrando{cursor:col-resize;user-select:none}body.arrastrando #mapa{pointer-events:none}
 .pista{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:600;background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:99px;font-size:14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100% - 20px);text-align:center}
 .leyenda{position:absolute;left:10px;bottom:22px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;display:flex;gap:10px;flex-wrap:wrap;max-width:calc(100% - 20px)}
 .leyenda i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1px}
@@ -271,8 +280,9 @@ button.peligro{background:var(--warn);border-color:var(--warn);color:#fff}
 #formCarga :disabled{opacity:.55;cursor:not-allowed}
 #aMsg:focus{outline:3px solid var(--accent);outline-offset:2px}
 #aPreviaTitulo:focus{outline:none}
-@media (max-width:1150px){.app{grid-template-columns:76px 340px minmax(0,1fr)}body.ancho .app{grid-template-columns:76px minmax(0,62%) minmax(0,1fr)}}
+@media (max-width:1150px){.app{grid-template-columns:76px var(--ancho-panel,340px) minmax(0,1fr)}body.ancho .app{grid-template-columns:76px var(--ancho-panel-amplio,minmax(0,62%)) minmax(0,1fr)}}
 @media (max-width:900px){
+  .divisor{display:none}
   body{overflow:visible;display:block;height:auto}html{height:auto}
   .app,body.ancho .app{display:flex;flex-direction:column}
   .riel{order:-2;flex-direction:row;overflow-x:auto;position:sticky;top:0;z-index:800;padding:0}

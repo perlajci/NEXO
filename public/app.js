@@ -1614,5 +1614,98 @@
       $('#estadoDatos').innerHTML = `<span class="chip mal">Servidor no disponible: ${esc(err.message)}</span>`;
     }
   }
+  // ---------- Ancho del panel: divisor arrastrable entre el panel y el mapa ----------
+  // Se arrastra con el mouse o el dedo; con el teclado: flechas (Mayús = pasos grandes), Inicio y Fin.
+  // Doble clic regresa al ancho original. Se recuerda en este navegador, aparte para Municipios y Tabulador (panel amplio).
+  const ANCHO_MIN = 280; // panel más angosto que se permite
+  const MAPA_MIN = 320; // el mapa nunca queda más angosto que esto
+  const ANCHOS = { normal: ['--ancho-panel', 'piani.anchoPanel'], amplio: ['--ancho-panel-amplio', 'piani.anchoPanelAmplio'] };
+  const divisor = $('#divisor');
+  const panelEl = $('#panel');
+  const modoAncho = () => (document.body.classList.contains('ancho') ? 'amplio' : 'normal');
+  const limitesAncho = () => ({ min: ANCHO_MIN, max: Math.max(ANCHO_MIN, window.innerWidth - panelEl.getBoundingClientRect().left - MAPA_MIN) });
+  const recortar = (px) => { const { min, max } = limitesAncho(); return Math.round(Math.min(max, Math.max(min, px))); };
+  function ariaAncho() {
+    const { min, max } = limitesAncho();
+    const v = Math.round(panelEl.getBoundingClientRect().width);
+    divisor.setAttribute('aria-valuemin', min);
+    divisor.setAttribute('aria-valuemax', Math.round(max));
+    divisor.setAttribute('aria-valuenow', v);
+    divisor.setAttribute('aria-valuetext', `Panel de ${v} píxeles`);
+  }
+  function fijarAncho(px, { guardar = true, modo = modoAncho() } = {}) {
+    const [variable, clave] = ANCHOS[modo];
+    const v = recortar(px);
+    document.documentElement.style.setProperty(variable, `${v}px`);
+    if (guardar) { try { localStorage.setItem(clave, String(v)); } catch { /* sin almacenamiento */ } }
+    return v;
+  }
+  function anchoOriginal() {
+    const [variable, clave] = ANCHOS[modoAncho()];
+    document.documentElement.style.removeProperty(variable);
+    try { localStorage.removeItem(clave); } catch { /* sin almacenamiento */ }
+    mapa.invalidateSize();
+    ariaAncho();
+  }
+  // Al cargar: aplica los anchos guardados (sin pasar del espacio disponible).
+  for (const [modo, [, clave]] of Object.entries(ANCHOS)) {
+    let v = null;
+    try { v = Number(localStorage.getItem(clave)) || null; } catch { v = null; }
+    if (v) fijarAncho(v, { guardar: false, modo });
+  }
+
+  divisor.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    divisor.setPointerCapture(e.pointerId);
+    document.body.classList.add('arrastrando');
+    const izq = panelEl.getBoundingClientRect().left;
+    let pendiente = null;
+    const mover = (ev) => {
+      pendiente = ev.clientX - izq;
+      requestAnimationFrame(() => { if (pendiente !== null) { fijarAncho(pendiente, { guardar: false }); pendiente = null; } });
+    };
+    const soltar = (ev) => {
+      divisor.removeEventListener('pointermove', mover);
+      divisor.removeEventListener('pointerup', soltar);
+      divisor.removeEventListener('pointercancel', soltar);
+      document.body.classList.remove('arrastrando');
+      fijarAncho(ev.clientX - izq);
+      mapa.invalidateSize();
+      ariaAncho();
+    };
+    divisor.addEventListener('pointermove', mover);
+    divisor.addEventListener('pointerup', soltar);
+    divisor.addEventListener('pointercancel', soltar);
+  });
+  divisor.addEventListener('dblclick', anchoOriginal);
+  divisor.addEventListener('focus', ariaAncho);
+  divisor.addEventListener('keydown', (e) => {
+    const actual = panelEl.getBoundingClientRect().width;
+    const paso = e.shiftKey ? 96 : 24;
+    const nuevo = { ArrowLeft: actual - paso, ArrowRight: actual + paso, Home: ANCHO_MIN, End: Infinity }[e.key];
+    if (nuevo === undefined) return;
+    e.preventDefault();
+    fijarAncho(nuevo);
+    mapa.invalidateSize();
+    ariaAncho();
+  });
+  // Si la ventana se achica, el panel guardado se recorta para que el mapa siga visible.
+  let esperaVentana = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(esperaVentana);
+    esperaVentana = setTimeout(() => {
+      for (const [modo, [variable]] of Object.entries(ANCHOS)) {
+        const v = parseFloat(document.documentElement.style.getPropertyValue(variable));
+        if (v) fijarAncho(v, { guardar: false, modo });
+      }
+      mapa.invalidateSize();
+      ariaAncho();
+    }, 150);
+  });
+  // Al cambiar de sección (Municipios usa otro ancho) el valor para lectores de pantalla se actualiza.
+  new MutationObserver(() => requestAnimationFrame(ariaAncho)).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  ariaAncho();
+
   iniciar();
 })();
