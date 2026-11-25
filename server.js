@@ -19,6 +19,7 @@ import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DAT
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
 import { crearAlmacenJSON } from './lib/almacen.js';
+import { crearSesiones, esPublico, claveIgual, leerCookie, cookieSesion, COOKIE } from './lib/sesion.js';
 import {
   validarCSV, compararTabuladores, reemplazarTabulador, listarHistorial, claveCorrecta, RE_RESPALDO, LIMITE_BYTES,
 } from './lib/tabulador-admin.js';
@@ -272,7 +273,7 @@ function estadisticaSismica(lat, lon, radioKm, magMin) {
 }
 
 // ---------- HTTP ----------
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg' };
 
 function enviar(res, codigo, cuerpo, tipo = 'application/json; charset=utf-8') {
   res.writeHead(codigo, { 'Content-Type': tipo, 'Cache-Control': 'no-store' });
@@ -642,9 +643,63 @@ function estatico(res, ruta) {
   });
 }
 
+// ---------- Inicio de sesión (ver lib/sesion.js) ----------
+// Activo solo si existe PIANI_CLAVE. Se lee en cada petición para poder activarlo en las pruebas.
+const sesiones = crearSesiones();
+const loginActivo = () => !!process.env.PIANI_CLAVE;
+// IP para frenar intentos: en Render llega en X-Forwarded-For; en otro lado se usa la del socket
+// (fuera de un proxy ese encabezado lo puede inventar cualquiera).
+const ipDe = (req) => (process.env.RENDER && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || 'desconocida';
+const esHttps = (req) => req.headers['x-forwarded-proto'] === 'https' || !!req.socket.encrypted;
+const tieneSesion = (req) => sesiones.valida(leerCookie(req, COOKIE));
+
+async function apiSesion(req, res, ruta) {
+  if (ruta === '/api/sesion' && req.method === 'GET') {
+    return enviar(res, 200, { requerida: loginActivo(), activa: !loginActivo() || tieneSesion(req) });
+  }
+  if (ruta === '/api/sesion/entrar' && req.method === 'POST') {
+    if (!loginActivo()) return enviar(res, 200, { ok: true, requerida: false });
+    const ip = ipDe(req);
+    const espera = sesiones.espera(ip);
+    if (espera) {
+      res.setHeader('Retry-After', String(Math.ceil(espera / 1000)));
+      return enviar(res, 429, { error: `Demasiados intentos. Espera ${Math.ceil(espera / 1000)} segundos y vuelve a intentarlo.`, esperaSegundos: Math.ceil(espera / 1000) });
+    }
+    const { clave } = await leerCuerpo(req);
+    if (!claveIgual(clave, process.env.PIANI_CLAVE)) {
+      sesiones.fallo(ip);
+      return enviar(res, 401, { error: 'La contraseña no es correcta.' });
+    }
+    res.setHeader('Set-Cookie', cookieSesion(sesiones.crear(ip), { segura: esHttps(req) }));
+    return enviar(res, 200, { ok: true });
+  }
+  if (ruta === '/api/sesion/salir' && req.method === 'POST') {
+    sesiones.cerrar(leerCookie(req, COOKIE));
+    res.setHeader('Set-Cookie', cookieSesion('', { segura: esHttps(req), borrar: true }));
+    return enviar(res, 200, { ok: true });
+  }
+  return enviar(res, 404, { error: 'Ruta no encontrada' });
+}
+
+// Sin sesión: la API responde 401 y las páginas mandan al login (y regresan después a donde iban).
+function pedirSesion(req, res, url) {
+  if (url.pathname.startsWith('/api/')) {
+    res.setHeader('X-Piani-Sesion', 'requerida');
+    return enviar(res, 401, { error: 'Inicia sesión para continuar.', sesion: 'requerida' });
+  }
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    const destino = `/login.html?siguiente=${encodeURIComponent(url.pathname + url.search)}`;
+    res.writeHead(302, { Location: destino, 'Cache-Control': 'no-store' });
+    return res.end();
+  }
+  return enviar(res, 401, 'Inicia sesión para continuar.', 'text/plain; charset=utf-8');
+}
+
 export const servidor = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    if (url.pathname.startsWith('/api/sesion')) return await apiSesion(req, res, url.pathname);
+    if (loginActivo() && !esPublico(req.method, url.pathname) && !tieneSesion(req)) return pedirSesion(req, res, url);
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else estatico(res, url.pathname);
   } catch (e) {
@@ -657,7 +712,10 @@ export async function iniciar() {
   await cargarClima();
   cargarSismos(); // en segundo plano
   await new Promise((r) => servidor.listen(PUERTO, r));
-  console.log(`NEXO listo en http://localhost:${PUERTO}`);
+  console.log(`PIANI listo en http://localhost:${PUERTO}`);
+  console.log(loginActivo()
+    ? 'Inicio de sesión activo (PIANI_CLAVE).'
+    : 'Aviso: sin PIANI_CLAVE el tablero está abierto, sin inicio de sesión (ver README).');
   return servidor;
 }
 

@@ -37,6 +37,10 @@ a{color:var(--accent)}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#2a9d63;box-shadow:0 0 0 3px rgba(42,157,99,.15);flex:none}
 .chip.mal{background:#fff1f1;border-color:#f6caca;color:#8f1218}.chip.mal::before{background:#d12b33;box-shadow:0 0 0 3px rgba(209,43,51,.15)}
 .chip button{margin-left:4px;font:700 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;min-height:0;padding:5px 10px;border-radius:99px;background:#0b2a55;color:#fff;border:0}
+/* Cerrar sesión: solo aparece cuando el servidor tiene PIANI_CLAVE. */
+.salir{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:6px 12px;border:1px solid #cfdbe7;border-radius:10px;background:#fff;color:#0b2a55;font:600 13.5px "Plus Jakarta Sans",system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.salir svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.salir:hover{border-color:#b8222b;color:#b8222b}.salir:focus-visible{outline:3px solid rgba(25,195,207,.45);outline-offset:2px}
 /* El ancho del panel se ajusta arrastrando el divisor (--ancho-panel y, en Municipios y Tabulador, --ancho-panel-amplio). */
 .app{flex:1;display:grid;grid-template-columns:88px var(--ancho-panel,420px) minmax(0,1fr);min-height:0}
 body.ancho .app{grid-template-columns:88px var(--ancho-panel-amplio,minmax(0,58%)) minmax(0,1fr)}

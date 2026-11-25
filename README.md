@@ -42,6 +42,22 @@ Google cobra por uso con un tope mensual gratuito: pon alertas de presupuesto. E
 
 Sin internet, NEXO estima en línea recta (con factor de rodeo de 1.3 y 40 km/h) y lo indica.
 
+### Inicio de sesión (`PIANI_CLAVE`, recomendado)
+
+Con esta variable, el tablero pide una **contraseña del equipo** en una pantalla de inicio de sesión (`/login.html`):
+
+```bash
+PIANI_CLAVE=una_contraseña_larga npm start               # Git Bash, Linux, Render
+$env:PIANI_CLAVE="una_contraseña_larga"; npm start       # PowerShell
+```
+
+**Nunca la escribas en el código ni la subas al repositorio**; en Render va en *Environment*. Sin la variable, PIANI funciona abierto, como antes, y lo avisa al arrancar.
+
+- **Sesión:** dura 12 horas y se guarda en una cookie `HttpOnly`, que el JavaScript de la página no puede leer, marcada `Secure` en HTTPS. Las sesiones viven en memoria, así que al reiniciar el servidor hay que volver a entrar.
+- **Intentos fallidos:** tras 5 desde la misma IP, el servidor pide esperar 1 minuto.
+- **Sin sesión:** la API responde 401 y las páginas mandan al login; al entrar, se regresa a la sección que se estaba viendo. El botón **Cerrar sesión** está arriba a la derecha.
+- **Rutas que siguen abiertas:** la página pública `cerca.html` (con `sw.js`, el manifiesto y `/api/albergues/publicos`), porque se usa sin internet, y `POST /api/lora/trama`, porque el puente USB y la puerta de enlace de los ESP32 no tienen sesión.
+
 ### Clave para cargar un tabulador nuevo (`TABULADOR_ADMIN_KEY`, opcional)
 
 PIANI no tiene cuentas de usuario, así que el botón **Cargar tabulador** (sección Tabulador → Actualizar precios) solo funciona si el servidor tiene esta variable de entorno y quien carga el archivo escribe la misma clave:
@@ -128,7 +144,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 61 pruebas: lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv` y `test/fixture/capcee/tabulador_prueba.csv`, con **cifras y precios inventados** solo para probar el código.
+`npm test` corre 68 pruebas (7 del inicio de sesión en `test/sesion.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv` y `test/fixture/capcee/tabulador_prueba.csv`, con **cifras y precios inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
@@ -182,5 +198,5 @@ Pruebas del tabulador (40):
 - Los albergues sugeridos son localidades, no inmuebles: hay que verificar escuela o deportivo, estructura, servicios y accesos.
 - Las rutas no conocen los cierres de vías provocados por el desastre.
 - Los sismos no se predicen; la climatología usa 2020–2024 por los límites de la API gratuita.
-- Sin usuarios ni contraseñas: hay que agregarlos antes de un uso real.
+- El inicio de sesión usa una sola contraseña del equipo (`PIANI_CLAVE`), sin cuentas por persona: no queda registro de quién hizo cada cambio. `POST /api/lora/trama` sigue abierto para los ESP32, así que cualquiera en la red podría mandar un reporte; para uso real, conviene agregar una clave por dispositivo.
 - Privacidad: se guardan conteos por albergue, no datos personales.

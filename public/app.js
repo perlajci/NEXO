@@ -1,6 +1,27 @@
 // NEXO v0.2 · interfaz por secciones. Todo texto que viene de datos se escapa antes de insertarse.
 (() => {
   'use strict';
+  // ---------- Sesión ----------
+  // Si la sesión vence mientras se usa PIANI, el servidor responde 401 con X-Piani-Sesion: requerida.
+  // Cualquier petición que lo reciba manda al login y, al entrar, regresa a la misma sección.
+  const irAlLogin = () => location.replace(`/login.html?siguiente=${encodeURIComponent(location.pathname + location.hash)}`);
+  const fetchOriginal = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    const r = await fetchOriginal(...args);
+    if (r.status === 401 && r.headers.get('X-Piani-Sesion') === 'requerida') irAlLogin();
+    return r;
+  };
+  fetchOriginal('/api/sesion', { cache: 'no-store' }).then((r) => r.json()).then((s) => {
+    if (!s.requerida) return; // login apagado (sin PIANI_CLAVE): no hay nada que cerrar
+    const b = document.querySelector('#btnSalir');
+    b.hidden = false;
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      await fetchOriginal('/api/sesion/salir', { method: 'POST' }).catch(() => {});
+      location.replace('/login.html');
+    });
+  }).catch(() => {});
+
   // ---------- Utilidades ----------
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];

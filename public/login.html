@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iniciar sesión · PIANI</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="piani-logo.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/*
+LOGIN PIANI: fondo azul marino de la marca con curvas de nivel (el volcán, el territorio) y una
+tarjeta blanca donde el logo se usa tal cual, con su fondo blanco. Una sola acción: entrar.
+*/
+:root{--marino:#0b2a55;--marino2:#082044;--turquesa:#19c3cf;--acento:#0a7d89;--tinta:#0b2a55;--suave:#5b6d85;
+  --linea:#d3dde8;--error:#b8222b;--errorFondo:#fff1f1;--aviso:#7a5200;--avisoFondo:#fff6e0;
+  font-family:"Atkinson Hyperlegible Next",system-ui,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;min-height:100%;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);background:var(--marino2);color:var(--tinta)}
+
+/* ---------- Lado de la marca ---------- */
+.marca{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:56px 64px;color:#fff;
+  background:radial-gradient(90% 70% at 30% 25%,#123a74 0%,transparent 60%),linear-gradient(160deg,#0e3268,var(--marino) 55%,var(--marino2))}
+.curvas{position:absolute;inset:-10% -20% auto auto;width:130%;height:auto;opacity:.9;pointer-events:none}
+.curvas ellipse{fill:none;stroke:var(--turquesa);stroke-width:1.2}
+.marca-texto{position:relative;max-width:30rem}
+.marca h2{margin:0 0 14px;font:800 clamp(28px,3.2vw,42px)/1.12 "Plus Jakarta Sans",system-ui,sans-serif;letter-spacing:-.01em;text-wrap:balance}
+.marca p{margin:0;font-size:17px;line-height:1.55;color:#c9daf0;max-width:26rem}
+.marca .pie{position:relative;margin-top:40px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:13px;color:#9fb6d6}
+
+/* ---------- Tarjeta de acceso ---------- */
+.acceso{display:grid;place-items:center;padding:40px 24px;background:#f3f6fa}
+.tarjeta{width:100%;max-width:400px;background:#fff;border:1px solid #e2e9f1;border-radius:20px;padding:36px 36px 28px;
+  box-shadow:0 1px 2px rgba(11,42,85,.06),0 18px 50px -18px rgba(11,42,85,.28)}
+.logo{display:block;width:150px;height:auto;margin:0 auto 22px;mix-blend-mode:multiply} /* funde el fondo casi blanco del logo con la tarjeta */
+h1{margin:0;text-align:center;font:800 24px/1.2 "Plus Jakarta Sans",system-ui,sans-serif}
+.sub{margin:6px 0 26px;text-align:center;color:var(--suave);font-size:15px}
+label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+.campo{position:relative}
+input{width:100%;height:50px;padding:0 52px 0 16px;border:1.5px solid var(--linea);border-radius:12px;background:#f9fbfd;
+  font:400 17px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--tinta);transition:border-color .15s,box-shadow .15s,background-color .15s}
+input:hover{border-color:#b7c7d8}
+input:focus{outline:none;border-color:var(--acento);background:#fff;box-shadow:0 0 0 4px rgba(25,195,207,.22)}
+input[aria-invalid=true]{border-color:var(--error);box-shadow:0 0 0 4px rgba(184,34,43,.12)}
+.ver{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;display:grid;place-items:center;
+  border:0;border-radius:9px;background:transparent;color:var(--suave);cursor:pointer}
+.ver:hover{background:#eef3f8;color:var(--tinta)}
+.ver:focus-visible{outline:3px solid rgba(25,195,207,.55);outline-offset:0}
+.ver svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mayus{margin:8px 0 0;padding:6px 10px;border-radius:8px;background:var(--avisoFondo);color:var(--aviso);font-size:13px;font-weight:600}
+.error{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--errorFondo);border:1px solid #f4c9cb;color:var(--error);font-size:14px;font-weight:600}
+.entrar{width:100%;height:50px;margin-top:20px;border:0;border-radius:12px;background:var(--marino);color:#fff;cursor:pointer;
+  font:700 16px "Plus Jakarta Sans",system-ui,sans-serif;display:flex;align-items:center;justify-content:center;gap:10px;transition:background-color .15s,transform .05s}
+.entrar:hover{background:#123a74}
+.entrar:active{transform:translateY(1px)}
+.entrar:focus-visible{outline:3px solid var(--turquesa);outline-offset:3px}
+.entrar:disabled{background:#6f829c;cursor:default;transform:none}
+.giro{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:girar .8s linear infinite}
+@keyframes girar{to{transform:rotate(360deg)}}
+.ayuda{margin:22px 0 0;padding-top:18px;border-top:1px solid #edf1f6;text-align:center;font-size:14px;color:var(--suave)}
+.ayuda a{color:var(--acento);font-weight:700;text-decoration:none}
+.ayuda a:hover{text-decoration:underline}
+.ayuda a:focus-visible{outline:3px solid rgba(25,195,207,.55);outline-offset:2px;border-radius:4px}
+.nota{margin:14px 0 0;text-align:center;font-size:12.5px;color:#7a8aa0}
+[hidden]{display:none !important}
+
+/* ---------- Pantallas angostas ---------- */
+@media (max-width:860px){
+  body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .marca{padding:28px 24px 30px}
+  .marca h2{font-size:24px;margin-bottom:8px}
+  .marca p{font-size:15px}
+  .marca .pie{display:none}
+  .curvas{width:180%;inset:-40% -60% auto auto}
+  .acceso{place-items:start center;padding:24px 16px 32px}
+  .tarjeta{padding:28px 22px 22px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}.giro{animation-duration:2s}}
+</style>
+</head>
+<body>
+  <section class="marca" aria-label="PIANI">
+    <svg class="curvas" viewBox="0 0 800 800" aria-hidden="true">
+      <g transform="translate(560 250)">
+        <ellipse rx="40" ry="26" opacity=".55" transform="rotate(-12)"/>
+        <ellipse rx="85" ry="58" opacity=".45" transform="rotate(-9)"/>
+        <ellipse rx="135" ry="95" opacity=".36" transform="rotate(-6)"/>
+        <ellipse rx="190" ry="138" opacity=".28" transform="rotate(-4)"/>
+        <ellipse rx="252" ry="186" opacity=".21" transform="rotate(-2)"/>
+        <ellipse rx="320" ry="240" opacity=".15" transform="rotate(1)"/>
+        <ellipse rx="395" ry="300" opacity=".1" transform="rotate(3)"/>
+        <ellipse rx="478" ry="366" opacity=".07" transform="rotate(5)"/>
+      </g>
+    </svg>
+    <div class="marca-texto">
+      <h2>Saber quién está en riesgo antes de que llegue el primer reporte.</h2>
+      <p>Población expuesta, albergues, rutas y reportes sin internet para coordinar la atención de emergencias en Puebla.</p>
+      <p class="pie">Power Girls ITESP, HackaTec 2026</p>
+    </div>
+  </section>
+
+  <main class="acceso">
+    <div class="tarjeta">
+      <img class="logo" src="piani-logo.png" alt="PIANI" width="1045" height="805">
+      <h1>Inicia sesión</h1>
+      <p class="sub">Entra con la contraseña del equipo.</p>
+      <form id="form" novalidate>
+        <label for="clave">Contraseña</label>
+        <div class="campo">
+          <input id="clave" name="clave" type="password" autocomplete="current-password" required aria-describedby="mayus error" autofocus>
+          <button type="button" class="ver" id="ver" aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="clave">
+            <svg id="ojo" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p id="mayus" class="mayus" hidden>Bloq Mayús está activado.</p>
+        <p id="error" class="error" role="alert" hidden></p>
+        <button type="submit" class="entrar" id="entrar"><span id="entrarTxt">Entrar</span></button>
+      </form>
+      <p class="ayuda">¿Buscas un albergue? <a href="cerca.html">Abrir la página pública</a></p>
+      <p class="nota">La sesión dura 12 horas en este dispositivo.</p>
+    </div>
+  </main>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  // Solo destinos dentro de PIANI (evita que ?siguiente= mande a otro sitio).
+  const pedido = new URLSearchParams(location.search).get('siguiente') || '/';
+  const destino = /^\/(?!\/)[^\s\\]*$/.test(pedido) && !pedido.startsWith('/login.html') ? pedido : '/';
+  // Si se llegó desde un enlace como /#tabulador, el navegador conserva el #tabulador aquí: se respeta.
+  const ir = () => location.replace(destino.includes('#') || !/^#[\w-]+$/.test(location.hash) ? destino : destino + location.hash);
+
+  // Si el login está apagado o ya hay sesión, no hay nada que hacer aquí.
+  fetch('/api/sesion', { cache: 'no-store' }).then((r) => r.json()).then((s) => { if (!s.requerida || s.activa) ir(); }).catch(() => {});
+
+  const clave = $('#clave');
+  const error = $('#error');
+  const boton = $('#entrar');
+  const mostrarError = (txt) => { error.textContent = txt; error.hidden = !txt; clave.setAttribute('aria-invalid', String(!!txt)); };
+
+  // Mostrar u ocultar la contraseña.
+  const OJO = '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+  const OJO_TACHADO = '<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>';
+  $('#ver').addEventListener('click', () => {
+    const ver = clave.type === 'password';
+    clave.type = ver ? 'text' : 'password';
+    $('#ojo').innerHTML = ver ? OJO_TACHADO : OJO;
+    $('#ver').setAttribute('aria-pressed', String(ver));
+    $('#ver').setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    clave.focus();
+  });
+
+  // Aviso de Bloq Mayús.
+  const revisarMayus = (e) => { if (e.getModifierState) $('#mayus').hidden = !e.getModifierState('CapsLock'); };
+  clave.addEventListener('keydown', revisarMayus);
+  clave.addEventListener('keyup', revisarMayus);
+  clave.addEventListener('input', () => { if (!error.hidden) mostrarError(''); });
+
+  let reloj = null;
+  function esperar(segundos) {
+    clearInterval(reloj);
+    boton.disabled = true;
+    let s = segundos;
+    const pintar = () => { $('#entrarTxt').textContent = `Espera ${s} s`; };
+    pintar();
+    reloj = setInterval(() => {
+      s -= 1;
+      if (s <= 0) { clearInterval(reloj); boton.disabled = false; $('#entrarTxt').textContent = 'Entrar'; mostrarError(''); clave.focus(); } else pintar();
+    }, 1000);
+  }
+
+  $('#form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (boton.disabled) return;
+    if (!clave.value) { mostrarError('Escribe la contraseña.'); clave.focus(); return; }
+    boton.disabled = true;
+    boton.innerHTML = '<span class="giro" aria-hidden="true"></span><span id="entrarTxt">Entrando…</span>';
+    try {
+      const r = await fetch('/api/sesion/entrar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clave: clave.value }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { $('#entrarTxt').textContent = 'Listo'; ir(); return; }
+      boton.innerHTML = '<span id="entrarTxt">Entrar</span>';
+      boton.disabled = false;
+      mostrarError(j.error || 'No se pudo iniciar sesión.');
+      clave.select();
+      if (r.status === 429 && j.esperaSegundos) esperar(j.esperaSegundos);
+    } catch {
+      boton.innerHTML = '<span id="entrarTxt">Entrar</span>';
+      boton.disabled = false;
+      mostrarError('No hay conexión con el servidor. Revisa que PIANI esté encendido.');
+    }
+  });
+})();
+</script>
+</body>
+</html>
