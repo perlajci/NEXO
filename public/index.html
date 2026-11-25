@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NEXO · Puebla</title>
+<title>PIANI · Puebla</title>
+<link rel="icon" href="piani-logo.png" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -13,8 +14,7 @@
 <body>
 <header class="barra">
   <a class="marca" href="#inicio" data-ir="inicio">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 3"/><circle cx="16" cy="16" r="5" fill="currentColor"/></svg>
-    <span><strong>NEXO</strong><small>Población expuesta · Puebla</small></span>
+    <img class="logo" src="piani-logo.png" alt="PIANI, inicio" width="1045" height="805">
   </a>
   <div class="escenario" role="group" aria-label="Escenario">
     <label>Fenómeno <select id="fFenomeno"></select></label>
@@ -43,43 +43,36 @@
 
     <!-- INICIO -->
     <section class="sec inicio" data-sec="inicio">
-      <div class="lectura" aria-live="polite">
-        <h1><span id="iCifra" class="lectura-cifra">–</span> <span class="lectura-txt">personas viven en localidades con riesgo alto o muy alto</span></h1>
-        <div id="iFranja" class="franja"></div>
-        <p id="iDetalle" class="lectura-detalle">Calculando con el escenario elegido en la barra superior…</p>
-        <button type="button" class="primario" data-ir="riesgo">Abrir el mapa de riesgo</button>
+      <div class="hero" aria-live="polite">
+        <p id="iEscenario" class="hero-esc">Cargando escenario…</p>
+        <p id="iCifra" class="hero-cifra">–</p>
+        <h1 class="hero-txt">personas en riesgo alto o muy alto</h1>
+        <div id="iFranja" class="hero-franja"></div>
+        <dl class="hero-datos">
+          <div><dt>de la población</dt><dd id="iPct">–</dd></div>
+          <div><dt>habitantes</dt><dd id="iPob">–</dd></div>
+          <div><dt>municipios en riesgo alto o muy alto</dt><dd id="iMun">–</dd></div>
+        </dl>
       </div>
 
-      <p class="intro">NEXO cruza el censo del INEGI con datos del volcán, sismos y clima para saber cuánta gente está en riesgo, dónde conviene abrir albergues y cuántas personas faltan por confirmar.</p>
-
-      <h2>Antes de la emergencia</h2>
-      <ul class="acciones">
-        <li><button type="button" class="accion" data-ir="riesgo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg><span><b>Ver el riesgo en Puebla</b><span>Semáforo por localidad según el fenómeno y el mes.</span></span></button></li>
-        <li><button type="button" class="accion" data-ir="contar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg><span><b>Contar personas en una zona</b><span>Dibuja un círculo o polígono y obtén población y grupos vulnerables.</span></span></button></li>
-        <li><button type="button" class="accion" data-ir="municipios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span><b>Revisar un municipio</b><span>Ranking estatal y ficha de cada municipio.</span></span></button></li>
-        <li><button type="button" class="accion" data-ir="albergues"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg><span><b>Proponer albergues</b><span>Sedes fuera de peligro que alcanzan a más gente en riesgo.</span></span></button></li>
-      </ul>
-
-      <h2>Durante la emergencia</h2>
-      <ul class="acciones">
-        <li><button type="button" class="accion" data-ir="operacion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg><span><b>Registrar albergues y bases</b><span>Personas a salvo, capacidad y necesidades; expuestos contra confirmados.</span></span></button></li>
-        <li><button type="button" class="accion" data-ir="rutas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg><span><b>Trazar una ruta de atención</b><span>De la base más cercana a la emergencia, o de ahí al albergue.</span></span></button></li>
-      </ul>
+      <nav class="mosaico" aria-label="Herramientas principales">
+        <button type="button" data-ir="riesgo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>Mapa de riesgo</button>
+        <button type="button" data-ir="contar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg>Contar población</button>
+        <button type="button" data-ir="municipios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Municipios</button>
+        <button type="button" data-ir="albergues"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg>Albergues</button>
+        <button type="button" data-ir="operacion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg>Operación</button>
+        <button type="button" data-ir="rutas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg>Rutas</button>
+      </nav>
 
       <a class="publica" href="cerca.html" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
-        <span><b>Página para la población</b><span>Muestra el albergue más cercano y funciona sin internet. Compártela con la gente de la zona.</span></span>
+        <span><b>Albergue más cercano</b><small>Página para la población, funciona sin internet</small></span>
       </a>
 
-      <h2>Estado de los datos</h2>
-      <ul id="checklist" class="checklist"></ul>
-
-      <h2>Primeros pasos</h2>
-      <ol class="pasos">
-        <li>Elige el <b>fenómeno</b> y el <b>mes</b> en la barra superior: todo NEXO se recalcula con ese escenario.</li>
-        <li>Cambia de herramienta con la barra lateral (arriba, en el celular).</li>
-        <li>Cada herramienta explica qué hacer en el recuadro “Cómo se usa”.</li>
-      </ol>
+      <details class="datos">
+        <summary>Estado de los datos</summary>
+        <ul id="checklist" class="checklist"></ul>
+      </details>
     </section>
 
     <!-- MAPA DE RIESGO -->
