@@ -171,7 +171,7 @@ function estadoEscuelas() {
   if (!d) return { cargadas: false, total: 0, aviso: AVISO_SIN_ESCUELAS };
   return {
     cargadas: d.escuelas.length > 0, total: d.escuelas.length, resumen: d.resumen, errores: d.errores,
-    descartes: d.descartes, limites: LIMITES_PUEBLA,
+    descartes: d.descartes.slice(0, 50), limites: LIMITES_PUEBLA,
     aviso: d.escuelas.length ? null : `Ningún renglón de data/escuelas/ se pudo usar. ${d.errores.join(' ')}`.trim(),
   };
 }

@@ -10,6 +10,7 @@
     "preparar": "node scripts/preparar-datos.js",
     "test": "node --test test/*.test.js",
     "escuelas:revisar": "node scripts/revisar-escuelas.js",
+    "escuelas:recortar": "node scripts/recortar-escuelas.js",
     "lora:simular": "node scripts/simular-lora.js",
     "puente:usb": "powershell -ExecutionPolicy Bypass -File scripts/puente-usb.ps1"
   },

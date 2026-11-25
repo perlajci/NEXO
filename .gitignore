@@ -3,3 +3,6 @@ data/confirmaciones.json
 .env
 data/presupuestos.json
 data/capcee/historial/
+# Catálogo nacional de la SEP (pesa ~190 MB); se usa el recorte data/escuelas/escuelas_puebla.csv
+data/escuelas/cnct*.csv
+data/escuelas/original/

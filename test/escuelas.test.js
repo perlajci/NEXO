@@ -9,11 +9,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   procesarEscuelas, cargarEscuelasDesdeCarpeta, normalizarNivel, normalizarSostenimiento, decimalesCoord, dentroDePuebla, claveEntidad,
+  limpio, limpiarTurno, armarDomicilio,
 } from '../lib/escuelas.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const SEP = path.join(DIR, 'fixture/escuelas/escuelas_prueba.csv');
 const DENUE = path.join(DIR, 'fixture/escuelas/denue_prueba.csv');
+const CNCT = path.join(DIR, 'fixture/escuelas/cnct_prueba.csv'); // mismo encabezado que cnct2026.csv de la SEP
 const PRUEBA = 'DATOS DE PRUEBA (inventados solo para probar el código)';
 const leer = (f) => procesarEscuelas(fs.readFileSync(f, 'utf8'), path.basename(f));
 
@@ -22,9 +24,9 @@ test('escuelas: lee el catálogo SEP y normaliza los campos', () => {
   const { escuelas } = leer(SEP);
   const [uno, dos, tres] = escuelas;
   assert.deepEqual(uno, {
-    id: '21ZZZ0001A', cct: '21ZZZ0001A', nombre: 'Escuela de prueba Uno, turno matutino', nivel: 'Primaria', sostenimiento: 'Público',
-    municipio: 'Municipio A', localidad: 'Localidad Dos', lat: 19.1667, lon: -98.3333, alumnos: 320, turnos: ['MATUTINO'],
-    fuente: PRUEBA, decimales_coord: 'alta',
+    id: '21ZZZ0001A', cct: '21ZZZ0001A', nombre: 'Escuela de prueba Uno, turno matutino', tipo_ct: '', tipo_educativo: '', nivel: 'Primaria',
+    subnivel: '', sostenimiento: 'Público', subcontrol: '', municipio: 'Municipio A', localidad: 'Localidad Dos', ambito: '', domicilio: '',
+    lat: 19.1667, lon: -98.3333, alumnos: 320, turnos: ['MATUTINO'], fuente: PRUEBA, decimales_coord: 'alta',
   });
   assert.equal(dos.alumnos, null, 'alumnos vacío = null, no 0');
   assert.equal(dos.sostenimiento, 'Privado');
@@ -38,12 +40,15 @@ test('escuelas: lee el catálogo SEP y normaliza los campos', () => {
 
 test('escuelas: filtra por entidad 21 y cuenta aparte cada motivo de descarte', () => {
   const { resumen, descartes } = leer(SEP);
-  assert.deepEqual(resumen, { filas: 12, validas: 8, otraEntidad: 1, cctInvalido: 1, sinCoordenadas: 1, coordFueraDePuebla: 1, noEscolares: 0 });
-  assert.deepEqual(descartes.map((d) => [d.fila, d.motivo]), [
-    [5, 'entidad 15, no Puebla (21)'],
-    [6, 'entidad 21 pero coordenadas fuera de Puebla (19.4326, -99.1332)'],
-    [7, 'sin coordenadas'],
-    [12, 'El CCT no tiene el formato esperado, por ejemplo 21DPR1273G.'],
+  assert.deepEqual(resumen, {
+    filas: 12, validas: 8, otraEntidad: 1, noEscolares: 0, cctInvalido: 1, sinCoordenadas: 1, coordCero: 0, coordFueraDePuebla: 1,
+    cctNoCoincide: 0, tiposDescartados: {},
+  });
+  assert.deepEqual(descartes.map((d) => [d.fila, d.cct, d.motivo]), [
+    [5, '15ZZZ0004D', 'entidad 15, no Puebla (21)'],
+    [6, '21ZZZ0005E', 'coordenadas fuera de Puebla (19.4326, -99.1332)'],
+    [7, '21ZZZ0006F', 'sin coordenadas'],
+    [12, '21ZZ00081H', 'El CCT no tiene el formato esperado, por ejemplo 21DPR1273G.'],
   ]);
   assert.equal(dentroDePuebla(19.04, -98.2), true);
   assert.equal(dentroDePuebla(19.4326, -99.1332), false);
@@ -60,6 +65,7 @@ test('escuelas: informa columnas reconocidas, no reconocidas y si hay latitud y 
   assert.deepEqual(columnas.noReconocidas, ['COLUMNA_EXTRA']);
   assert.equal(columnas.reconocidas.cct, 'CLAVE_CT');
   assert.equal(columnas.reconocidas.entidad, 'CVE_ENT');
+  assert.equal(columnas.entidad, 'clave');
   assert.equal(columnas.latLon, true);
   assert.equal(columnas.turno, true);
   assert.deepEqual(leer(DENUE).columnas.noReconocidas, ['raz_social', 'per_ocu', 'entidad'], 'entidad se toma de cve_ent');
@@ -100,9 +106,61 @@ test('escuelas: un registro por CCT, suma alumnos de todos los turnos y separa l
   assert.deepEqual(r.resumen.porFuente, { [PRUEBA]: 5, 'DENUE (INEGI)': 2 });
   assert.equal(r.resumen.filas, 16);
   assert.equal(r.resumen.otraEntidad, 2);
-  assert.deepEqual(r.resumen.archivos.map((a) => [a.formato, a.latLon, a.entidad]), [['SEP', true, true], ['DENUE', true, true]]);
+  assert.deepEqual(r.resumen.archivos.map((a) => [a.formato, a.latLon, a.entidad]), [['SEP', true, 'clave'], ['DENUE', true, 'clave']]);
   assert.equal(r.errores.length, 1);
   assert.match(r.errores[0], /c_malo\.csv: faltan columnas/);
+});
+
+// ---------- Catálogo Nacional de Centros de Trabajo (CNCT) de la SEP ----------
+test('CNCT: reconoce las columnas reales y normaliza el registro', () => {
+  const { escuelas, columnas } = leer(CNCT);
+  assert.equal(columnas.formato, 'SEP (CNCT)');
+  assert.equal(columnas.entidad, 'nombre', 'no trae cve_ent: filtra por inmueble_c_nom_ent');
+  assert.equal(columnas.alumnos, false);
+  assert.deepEqual(
+    [columnas.reconocidas.cct, columnas.reconocidas.nombre, columnas.reconocidas.lat, columnas.reconocidas.lon, columnas.reconocidas.entidad_nombre],
+    ['cv_cct', 'c_nombre', 'inmueble_latitud', 'inmueble_longitud', 'inmueble_c_nom_ent'],
+  );
+  assert.ok(columnas.noReconocidas.includes('c_administrativa'));
+  assert.ok(columnas.noReconocidas.includes('supervision_cv_cct'));
+  assert.deepEqual(escuelas[0], {
+    id: '21ZZZ0101A', cct: '21ZZZ0101A', nombre: 'Primaria de Prueba (dato inventado)', tipo_ct: 'escuela', tipo_educativo: 'básica',
+    nivel: 'primaria', subnivel: 'general', sostenimiento: 'Público', subcontrol: 'Federal', municipio: 'Municipio A', localidad: 'Localidad Dos',
+    ambito: 'urbano', domicilio: 'Calle de Prueba 12, Colonia de Prueba, C.P. 72000', lat: 19.1667, lon: -98.3333,
+    alumnos: null, turnos: ['matutino', 'vespertino'], fuente: 'Catálogo CCT (SEP)', decimales_coord: 'alta',
+  });
+  const bach = escuelas[1];
+  assert.deepEqual([bach.tipo_ct, bach.tipo_educativo, bach.nivel, bach.subnivel], ['plantel (media superior)', '', '', ''], '"Sin Dato" queda vacío');
+  assert.deepEqual([bach.turnos, bach.domicilio, bach.ambito, bach.subcontrol], [['discontinuo'], 'Calle de Prueba, Colonia de Prueba', 'rural', 'Estatal'], 'número y CP en 0 no se escriben');
+  assert.ok(escuelas.every((e) => e.alumnos === null), 'el CNCT no trae alumnos: no se inventan');
+});
+
+test('CNCT: filtra Puebla por nombre, solo planteles, y cuenta cada descarte con su CCT', () => {
+  const { escuelas, resumen, descartes } = leer(CNCT);
+  assert.deepEqual(escuelas.map((e) => e.cct), ['21ZZZ0101A', '21ZZZ0102B', '15ZZZ0108H', '21ZZZ0109J'], '"PUEBLA" en mayúsculas también cuenta');
+  assert.deepEqual(resumen, {
+    filas: 10, validas: 4, otraEntidad: 1, noEscolares: 2, cctInvalido: 0, sinCoordenadas: 1, coordCero: 1, coordFueraDePuebla: 1,
+    cctNoCoincide: 1, tiposDescartados: { administrativo: 1, biblioteca: 1 },
+  });
+  assert.deepEqual(descartes.map((d) => [d.fila, d.cct, d.motivo]), [
+    [4, '21ZZZ0103C', 'c_tipo "administrativo" no es plantel'],
+    [5, '21ZZZ0104D', 'c_tipo "biblioteca" no es plantel'],
+    [6, '01ZZZ0105E', 'entidad Aguascalientes, no Puebla'],
+    [7, '21ZZZ0106F', 'coordenada en 0 (0, 0)'],
+    [8, '21ZZZ0107G', 'coordenadas fuera de Puebla (21.8830, -102.2763)'],
+    [11, '21ZZZ0110K', 'sin coordenadas'],
+  ]);
+});
+
+test('CNCT: limpieza de "sin dato", turnos y domicilio', () => {
+  assert.equal(limpio('Sin Dato'), '');
+  assert.equal(limpio(' sin dato '), '');
+  assert.equal(limpio('San  Pedro'), 'San Pedro');
+  assert.equal(limpiarTurno('1 - matutino'), 'matutino');
+  assert.equal(limpiarTurno('2 - vespertino (inactivo)'), 'vespertino (inactivo)');
+  assert.equal(limpiarTurno('sin dato'), '');
+  assert.equal(armarDomicilio({ vialidad: 'Calle 5', num_ext: '0', asentamiento: 'Centro', cp: '7200' }), 'Calle 5, Centro, C.P. 07200');
+  assert.equal(armarDomicilio({ vialidad: 'Sin Dato', num_ext: '', asentamiento: 'sin dato', cp: '0' }), '');
 });
 
 test('escuelas: nivel, sostenimiento y decimales de la coordenada', () => {

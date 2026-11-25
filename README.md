@@ -134,40 +134,48 @@ Todavía no existe. Cuando lo agregues, con al menos la columna `cct` y de prefe
 
 ## Escuelas (`data/escuelas/*.csv`)
 
-Copia en `data/escuelas/` uno o varios CSV de escuelas de Puebla. PIANI reconoce dos fuentes públicas:
+La fuente principal es el **Catálogo Nacional de Centros de Trabajo (CNCT) de la SEP** (`cnct2026.csv`, ~190 MB, todo el país). Para usarlo:
 
-- **Catálogo de Centros de Trabajo (CCT) de la SEP:** trae la clave CCT y, a veces, el número de alumnos.
-- **DENUE del INEGI**, actividades `6111`, `6112` y `6113` (escuelas). No trae CCT ni alumnos: esos campos quedan vacíos y la escuela se identifica como `DENUE-<id>`. **PIANI nunca inventa una CCT.**
+1. Copia `cnct2026.csv` en `data/escuelas/`.
+2. `npm run escuelas:recortar`: guarda solo Puebla en `data/escuelas/escuelas_puebla.csv` (~11 MB, mismas columnas) y mueve el archivo nacional a `data/escuelas/original/`, para que el servidor no lo lea dos veces. El nacional está en `.gitignore`.
+3. `npm run escuelas:revisar`: dice cuántas escuelas se leyeron, cuántas se descartaron por cada motivo, qué columnas se reconocieron y cuáles no, si trae latitud y longitud, y qué valores distintos traen tipo de centro, nivel, turnos y sostenimiento.
 
-Revisa el archivo sin arrancar el servidor con `npm run escuelas:revisar`: dice cuántas escuelas se leyeron, cuántas se descartaron por cada motivo, qué columnas se reconocieron y si trae latitud y longitud. Un CSV nuevo se lee sin reiniciar; sin archivo, Inicio muestra un aviso y el servidor sigue funcionando.
+Un CSV nuevo se lee sin reiniciar; sin archivo, Inicio muestra un aviso y el servidor sigue funcionando. El lector solo toma los CSV de `data/escuelas/`, no los de sus subcarpetas.
 
-Cada escuela queda con: `cct`, `nombre`, `nivel`, `sostenimiento`, `municipio`, `localidad`, `lat`, `lon`, `alumnos` (vacío si no viene), `turnos`, `fuente` y `decimales_coord`.
+También acepta otro CSV de la SEP con columnas `cct`, `nombre`, `latitud`, `longitud`, y el **DENUE del INEGI** (actividades `6111`, `6112` y `6113`). El DENUE no trae CCT ni alumnos: esos campos quedan vacíos y la escuela se identifica como `DENUE-<id>`. **PIANI nunca inventa una CCT, una coordenada ni una matrícula.**
 
-**Columnas que se reconocen** (sin importar mayúsculas, acentos ni guiones bajos):
+### Registro de cada escuela
 
-| Campo | Nombres aceptados |
-|---|---|
-| Entidad | `cve_ent`, `cv_ent`, `clave_entidad`, `cve_entidad`, `id_entidad`, `entidad` (número o “Puebla”) |
-| CCT | `cct`, `clave_ct`, `clave_cct`, `cv_cct`, `cve_cct`, `clave_centro_trabajo` (obligatoria en la SEP) |
-| Nombre | `nombre`, `nombre_ct`, `nombre_escuela`, `c_nombre`, `nom_estab` |
-| Nivel | `nivel`, `nivel_educativo`, `c_nivel`, `nombre_nivel` (en el DENUE sale de `nombre_act`) |
-| Sostenimiento | `sostenimiento`, `c_sostenimiento`, `tipo_sostenimiento`, `control` (en el DENUE sale de `nombre_act`) |
-| Turno | `turno`, `c_turno`, `nombre_turno` |
-| Municipio / localidad | `municipio`, `nombre_municipio`, `nom_mun`, `c_nom_mun` / `localidad`, `nombre_localidad`, `nom_loc`, `c_nom_loc` |
-| Coordenadas | `latitud` o `lat`, `longitud` o `lon` (decimal o grados-minutos-segundos) |
-| Alumnos | `alumnos`, `total_alumnos`, `matricula` |
+| Campo | En el CNCT sale de | Nota |
+|---|---|---|
+| `cct` | `cv_cct` | |
+| `nombre` | `c_nombre` | |
+| `tipo_ct` | `c_tipo` | Solo se usan `escuela` y `plantel (media superior)` |
+| `tipo_educativo`, `nivel`, `subnivel` | `tiponivelsub_c_servicion1`, `…2`, `…3` | Tal cual vienen (básica / primaria / general, etc.). Vacíos en `plantel (media superior)` |
+| `sostenimiento`, `subcontrol` | `sostenimiento_c_control`, `sostenimiento_c_subcontrol` | Público o Privado; Federal, Estatal, Autónomo, etc. |
+| `municipio`, `localidad`, `ambito` | `inmueble_c_nom_mun`, `inmueble_c_nom_loc`, `inmueble_c_nom_ambito` | Ámbito: urbano o rural |
+| `domicilio` | vialidad + número exterior + asentamiento + código postal | El 0 en número o CP no se escribe |
+| `lat`, `lon` | `inmueble_latitud`, `inmueble_longitud` | Decimal |
+| `turnos` | `c_turno_01`, `c_turno_02`, `c_turno_03` | Lista sin el número ni “sin dato”: `["matutino", "vespertino"]` |
+| `alumnos` | — | **El CNCT no trae alumnos: queda vacío** |
+| `fuente`, `decimales_coord` | | Ver abajo |
 
-**Filtros, en este orden** (cada descarte se cuenta aparte, con su renglón y motivo):
+“Sin Dato” o “sin dato” se guarda como vacío.
 
-1. **Clave de entidad = 21.** Si el archivo no trae la columna, se usa el inicio de la CCT (`21` = Puebla).
-2. **CCT con el formato de Puebla** (`21` + 3 letras + 4 dígitos + letra), solo en la SEP.
-3. **Coordenadas presentes.**
-4. **Revisión extra:** escuelas con entidad 21 cuya coordenada cae fuera del rectángulo que contiene al estado (latitud 17.8 a 20.9, longitud −99.1 a −96.7). Se descartan porque la coordenada está mal.
-5. **DENUE:** se descartan las actividades que no son escuelas.
+### Filtros, en este orden
 
-**Una escuela por CCT.** El catálogo de la SEP repite la CCT en un renglón por turno: PIANI deja un solo registro, **suma los alumnos de todos los turnos** y guarda la lista en `turnos`. Si un turno trae alumnos y otro no, la suma es un mínimo y se marca `alumnos_incompleto`. Un renglón con la misma CCT y el mismo turno se cuenta como repetido y no se suma.
+Cada descarte se cuenta aparte, con su renglón, su CCT y el motivo.
 
-**`decimales_coord`** dice qué tan fino está **escrita** la coordenada en el archivo, no si la escuela está realmente en ese punto:
+1. **Entidad Puebla.** En el CNCT, por `inmueble_c_nom_ent` = “Puebla” (sin importar mayúsculas ni acentos). En otros archivos, por la clave de entidad (`cve_ent` = 21) o, si no la traen, por el inicio `21` de la CCT. En el CNCT el `21` de la CCT es solo una **revisión**: las de Puebla cuya CCT no empieza con 21 se cuentan aparte, pero no se descartan.
+2. **Solo planteles.** En el CNCT, `c_tipo` debe ser `escuela` o `plantel (media superior)`. Los demás (administrativo, supervisión, biblioteca, rectoría, centros de apoyo del CONAFE, asistencial, etc.) se descartan y se cuentan por valor. En el DENUE, las actividades que no son escuelas.
+3. **CCT con formato válido** (2 dígitos + 3 letras + 4 dígitos + letra).
+4. **Coordenadas:** vacías, en 0 o fuera del rectángulo que contiene al estado (latitud 17.8 a 20.9, longitud −99.1 a −96.7).
+
+**Una escuela por CCT.** Si un archivo trae la CCT en un renglón por turno, PIANI deja un solo registro, **suma los alumnos de todos los turnos** y une la lista de `turnos`. Si un turno trae alumnos y otro no, la suma es un mínimo y se marca `alumnos_incompleto`. Un renglón con la misma CCT y los mismos turnos se cuenta como repetido. En el CNCT los turnos vienen en columnas y cada CCT aparece una sola vez.
+
+### `decimales_coord`
+
+Dice qué tan fino está **escrita** la coordenada en el archivo, no si la escuela está realmente en ese punto. El archivo de la SEP quita los ceros finales (`18.5938` puede ser `18.593800`), así que `media` y `baja` pueden ser más finas de lo que parecen.
 
 | Valor | Decimales (de la menos fina entre latitud y longitud) | Equivale a |
 |---|---|---|
@@ -187,7 +195,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 76 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 8 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 79 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 11 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 

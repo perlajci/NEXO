@@ -179,7 +179,8 @@
     if (!x?.cargadas) return esc(x?.aviso || 'Escuelas: sin datos.');
     const r = x.resumen;
     const fuera = [
-      r.otraEntidad && `${fmt(r.otraEntidad)} de otra entidad`, r.coordFueraDePuebla && `${fmt(r.coordFueraDePuebla)} de Puebla con coordenada fuera del estado`,
+      r.otraEntidad && `${fmt(r.otraEntidad)} de otra entidad`, r.noEscolares && `${fmt(r.noEscolares)} que no son planteles`,
+      r.coordFueraDePuebla && `${fmt(r.coordFueraDePuebla)} con coordenada fuera de Puebla`, r.coordCero && `${fmt(r.coordCero)} con coordenada en 0`,
       r.sinCoordenadas && `${fmt(r.sinCoordenadas)} sin coordenadas`, r.cctInvalido && `${fmt(r.cctInvalido)} con CCT inválida`,
       r.repetidas && `${fmt(r.repetidas)} repetidas`,
     ].filter(Boolean);
