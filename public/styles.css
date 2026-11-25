@@ -2,7 +2,7 @@
 PIANI: sala de control de Protección Civil en Puebla; sobria, legible bajo presión, lista para una demo.
 COLOR: azul marino y turquesa del logo PIANI para la interfaz; el semáforo
   verde-amarillo-naranja-rojo queda reservado solo para los datos de riesgo.
-TYPE: Atkinson Hyperlegible Next: se lee rápido, con prisa y con baja visión.
+TYPE: Plus Jakarta Sans para la marca (barra, riel, títulos, cifras); Atkinson Hyperlegible Next para el texto corrido.
 LAYOUT: riel de herramientas | panel de la sección | mapa; se apila en pantallas angostas.
 INICIO: tarjeta marina con la cifra del escenario, mosaico de herramientas y casi nada de texto.
 */
@@ -19,18 +19,24 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Atkinson Hyperlegible Next",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
 a{color:var(--accent)}
 /* La barra es blanca en ambos modos: el logo PIANI se usa tal cual, con su fondo blanco. */
-.barra{display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap;padding:6px 16px;background:#fff;color:#0b2a55;border-bottom:3px solid var(--turquesa)}
-.marca{display:flex;align-items:center;flex:none;text-decoration:none;border-radius:6px}
+/* Tipografía de marca (Plus Jakarta Sans): barra superior, riel, títulos y cifras. El texto corrido sigue en Atkinson. */
+.barra,.riel,h1,h2,.hero-esc,.hero-cifra,.hero-datos dd,.mosaico button,.publica b{font-family:"Plus Jakarta Sans","Atkinson Hyperlegible Next",system-ui,sans-serif}
+.barra{display:flex;align-items:center;gap:12px 28px;flex-wrap:wrap;padding:6px 20px;background:#fff;color:#0b2a55;border-bottom:3px solid var(--turquesa);box-shadow:0 1px 0 #e3eaf1}
+.marca{display:flex;align-items:center;flex:none;text-decoration:none;border-radius:6px;padding-right:28px;border-right:1px solid #e1e8ef}
 .marca .logo{display:block;height:60px;width:auto}
-.escenario{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.escenario label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;margin:0}
-.escenario select{min-height:36px;padding:2px 8px;font-size:14px;width:auto;margin:0;background:#fff;color:#0b2a55;border:1px solid #c9d6e4}
-.escenario select:focus-visible,.marca:focus-visible{outline:3px solid #0a7d89;outline-offset:2px}
-.escenario select:disabled{opacity:.6;background:#f1f4f8}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
-.chip{font-size:12px;padding:3px 10px;border-radius:99px;background:#eaf1f7;color:#0b2a55;white-space:nowrap}
-.chip button{background:#0b2a55;color:#fff;border-color:#0b2a55}
-.chip.mal{background:#ffd9d9;color:#7a0d12}.chip button{margin-left:6px;font-size:12px;min-height:0;padding:1px 8px}
+.escenario{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.escenario label{display:flex;flex-direction:column;gap:3px;margin:0;font-size:11.5px;font-weight:600;letter-spacing:.02em;color:#5b6d85}
+.escenario select{appearance:none;-webkit-appearance:none;min-height:40px;padding:6px 38px 6px 14px;margin:0;width:auto;border-radius:10px;border:1px solid #cfdbe7;
+  background:#f7fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230a7d89' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center/16px;
+  color:#0b2a55;font:600 15px/1.2 "Plus Jakarta Sans",system-ui,sans-serif;transition:border-color .15s,box-shadow .15s}
+.escenario select:hover{border-color:#0a7d89}
+.escenario select:focus-visible,.marca:focus-visible{outline:3px solid rgba(25,195,207,.45);outline-offset:1px;border-color:#0a7d89}
+.escenario select:disabled{color:#8a9ab0;background-color:#f1f4f8;border-color:#e1e8ef;cursor:not-allowed}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:99px;background:#f1f6fa;border:1px solid #dfe8f0;color:#0b2a55;white-space:nowrap;font-variant-numeric:tabular-nums}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#2a9d63;box-shadow:0 0 0 3px rgba(42,157,99,.15);flex:none}
+.chip.mal{background:#fff1f1;border-color:#f6caca;color:#8f1218}.chip.mal::before{background:#d12b33;box-shadow:0 0 0 3px rgba(209,43,51,.15)}
+.chip button{margin-left:4px;font:700 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;min-height:0;padding:5px 10px;border-radius:99px;background:#0b2a55;color:#fff;border:0}
 .app{flex:1;display:grid;grid-template-columns:88px 420px minmax(0,1fr);min-height:0}
 body.ancho .app{grid-template-columns:88px minmax(0,58%) minmax(0,1fr)}
 .riel{background:var(--riel);display:flex;flex-direction:column;padding:6px 0;overflow-y:auto}
@@ -151,7 +157,7 @@ code{font-size:13px;overflow-wrap:anywhere}
 }
 @media (max-width:600px){
   .barra{padding:10px 16px}.escenario{width:100%}.escenario label{flex-direction:column;align-items:stretch;gap:2px;flex:1 1 110px}.escenario label:first-child{flex-grow:2}.escenario select{width:100%}
-  .chip{flex:none}.leyenda{bottom:40px}
+  .chip{flex:none}.leyenda{bottom:40px}.marca{border-right:0;padding-right:0}.escenario select{font-size:14px;padding:6px 30px 6px 10px;background-position:right 8px center}
   .chips{flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding-bottom:2px}
   .panel{padding:18px 16px 40px}
   .stack thead{display:none}.stack tr{display:grid;padding-block:8px}.stack td{display:flow-root;border:0;padding:2px 0;padding-inline-start:7.5em;text-align:start}
