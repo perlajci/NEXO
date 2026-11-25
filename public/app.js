@@ -91,6 +91,7 @@
     if (sec === 'operacion' || sec === 'rutas') cargarConfirmaciones();
     if (sec === 'sismos' || sec === 'clima') textoCentro();
     if (sec === 'tabulador') { cargarTabulador(); cargarGuardados(); }
+    if (sec === 'inicio') pintarInicioTab();
   }
   $$('.riel button').forEach((b) => b.addEventListener('click', () => irA(b.dataset.sec)));
   document.addEventListener('click', (ev) => {
@@ -924,6 +925,19 @@
     }
   }
 
+  // Tarjeta del tabulador en Inicio: cuántos conceptos hay de cada tipo de dato.
+  async function pintarInicioTab() {
+    const caja = $('#iTabTipos');
+    try {
+      const r = await apiTab('/api/tabulador/resumen');
+      const NOMBRES = { 'OFICIAL CAPCEE': ['oficial del CAPCEE', 'oficiales del CAPCEE'], 'REFERENCIA PÚBLICA': ['de referencia pública', 'de referencia pública'], ESTIMADO: ['estimado', 'estimados'] };
+      caja.innerHTML = Object.entries(NOMBRES)
+        .map(([t, [uno, varios]]) => { const n = r.porTipo[t] || 0; return `<span class="tipo-dato ${TIPO_CLASE[t]}">${fmt(n)} ${n === 1 ? uno : varios}</span>`; }).join(' ');
+    } catch {
+      caja.textContent = 'El tabulador no está disponible en este momento.';
+    }
+  }
+
   function pintarKpisTab(r) {
     const t = r.total;
     $('#tKpis').innerHTML = `
@@ -1411,14 +1425,14 @@
       return `<li><b>${esc(c.nombre)}:</b> ${v(c.antes)} → ${v(c.despues)}</li>`;
     };
     const tablaMod = d.modificados.map((m) => `<tr class="${m.presupuestos ? 'usado' : ''}">
-        <td data-l="Concepto"><code>${esc(m.clave_ref)}</code><br>${esc(m.concepto)}${m.presupuestos ? `<br>${usado(m.presupuestos)}` : ''}</td>
+        <td data-l="Concepto"><code>${esc(m.clave_ref)}</code> ${etiquetaTipo(m)}<br>${esc(m.concepto)}${m.presupuestos ? `<br>${usado(m.presupuestos)}` : ''}</td>
         <td data-l="Qué cambió"><ul class="cambios">
           ${m.precio ? `<li><b>precio:</b> ${precioU(m.precio.antes, m.unidad)} → ${precioU(m.precio.despues, m.unidad)} <span class="dif ${m.precio.difMxn > 0 ? 'sube' : 'baja'}">${signo(m.precio.difMxn)}${m.unidad === '%' ? `${dos(Math.abs(m.precio.difMxn))} pts` : dinero(Math.abs(m.precio.difMxn))} (${signo(m.precio.difPct)}${fmt(Math.abs(m.precio.difPct), 1)} %)</span></li>` : ''}
           ${m.cambios.map((c) => cambio(c, m.unidad)).join('')}
         </ul></td>
       </tr>`).join('');
     const tablaElim = d.eliminados.map((x) => `<tr class="${x.presupuestos ? 'usado' : ''}">
-        <td data-l="Concepto"><code>${esc(x.clave_ref)}</code><br>${esc(x.concepto)}${x.presupuestos ? `<br>${usado(x.presupuestos)}` : ''}</td>
+        <td data-l="Concepto"><code>${esc(x.clave_ref)}</code> ${etiquetaTipo(x)}<br>${esc(x.concepto)}${x.presupuestos ? `<br>${usado(x.presupuestos)}` : ''}</td>
         <td data-l="Precio" class="n">${precioU(x.precio, x.unidad)}</td>
       </tr>`).join('');
     const tablaNuevos = d.nuevos.map((x) => `<tr>
@@ -1501,7 +1515,7 @@
 
   // Tras aplicar o restaurar: catálogo, indicadores, guardados (etiquetas) e historial, sin recargar la página.
   async function tabuladorCambio() {
-    await Promise.all([cargarTabulador(), cargarGuardados(), cargarAdmin()]);
+    await Promise.all([cargarTabulador(), cargarGuardados(), cargarAdmin(), pintarInicioTab()]);
     // Los conceptos del presupuesto en curso toman los datos nuevos; los que ya no existen se quitan.
     const cat = await apiTab('/api/tabulador').catch(() => null);
     if (cat && pres.renglones.length) {

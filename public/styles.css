@@ -250,6 +250,12 @@ button.peligro{background:var(--warn);border-color:var(--warn);color:#fff}
 .dialogo h2{margin:0 0 8px;font-size:18px}
 .dialogo p{margin:0 0 18px;color:var(--muted);font-size:14.5px}
 .dlg-botones{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.dlg-botones button{min-width:110px}
+/* ---------- Tarjeta del tabulador en Inicio y Ayuda ---------- */
+.tab-tipos{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tab-tipos .tipo-dato{cursor:inherit;text-transform:none}
+.ayuda-tab h3{font-size:14.5px;margin:14px 0 4px}.ayuda-tab ul{padding-left:18px}.ayuda-tab li{margin:6px 0}.ayuda-tab li .tipo-dato{margin-right:4px;cursor:default}
+.ayuda-tab .pendiente{font-style:italic;font-weight:600}
+.glosario{margin:6px 0 0}.glosario dt{font-weight:700;margin-top:8px}.glosario dd{margin:2px 0 0}
+
 /* ---------- Actualizar precios ---------- */
 .resumen-cambios{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:10px 0}
 .resumen-cambios li{padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--panel2);font-size:13.5px}

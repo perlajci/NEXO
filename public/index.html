@@ -71,6 +71,11 @@
         <span><b>Reportes en vivo (Red ESP32 / LoRa)</b><small id="iRepTxt">Ver reportes recibidos en el mapa</small></span>
       </a>
 
+      <a class="publica tab-acceso" href="#tabulador" data-ir="tabulador">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M8 18h.01M12 18h.01M16 14.5V18"/></svg>
+        <span><b>Tabulador de obra escolar</b><small>Consulta precios, arma presupuestos por partida y expórtalos a CSV.</small><span id="iTabTipos" class="tab-tipos"></span></span>
+      </a>
+
       <a class="publica" href="cerca.html" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
         <span><b>Albergue más cercano</b><small>Página para la población, funciona sin internet</small></span>
@@ -453,6 +458,35 @@
         <p>Modelo de cobertura máxima: se eligen, una por una, las localidades con peligro bajo (≤0.4) y suficientes habitantes que alcanzan, dentro de la distancia indicada, a más personas en riesgo, ponderadas por vulnerabilidad. La capacidad sugerida es la población cubierta por el porcentaje que usaría albergue. Hay que verificar en campo el inmueble, su estructura y los accesos.</p></details>
       <details class="caja"><summary>Limitaciones</summary>
         <ul><li>El censo cuenta dónde vive la gente, no dónde está a cada hora, y es de 2020.</li><li>Las localidades pequeñas tienen datos reservados por el INEGI: los conteos de grupos son un mínimo.</li><li>Los sismos no se predicen: se muestran frecuencias históricas.</li><li>Las rutas no conocen los cierres causados por el desastre.</li></ul></details>
+      <details class="caja ayuda-tab" id="ayudaTabulador"><summary>Tabulador y presupuestos</summary>
+        <h3>¿De dónde salen los precios?</h3>
+        <p>Cada concepto lleva una etiqueta con su tipo de dato; al pasar el cursor o tocarla se ve la fuente exacta.</p>
+        <ul>
+          <li><span class="tipo-dato referencia">REFERENCIA PÚBLICA</span> Tabulador de Edificación 2025 de SEINFRA Chiapas, región I-VII. Es un precio público de otro estado: sirve de referencia y se ajusta a Puebla con el factor del presupuesto.</li>
+          <li><span class="tipo-dato estimado">ESTIMADO</span> Promedio de mercado sin fuente oficial. <b>Debe validarse con el CAPCEE</b> antes de usarlo para comprometer recursos. Todo presupuesto que lo usa muestra: “Este presupuesto usa precios estimados; no es un costo oficial”.</li>
+          <li><span class="tipo-dato oficial">OFICIAL CAPCEE</span> Precios del CAPCEE, cuando se cargue su tabulador (Tabulador → Actualizar precios). Mientras no se cargue, ningún precio de PIANI es oficial.</li>
+        </ul>
+        <h3>IVA</h3>
+        <p>Todos los precios unitarios son <b>sin IVA</b>. El IVA del 16&nbsp;% se calcula sobre el subtotal y aparece en una línea aparte.</p>
+        <h3>Factores y conceptos con %</h3>
+        <p><b>Importe = cantidad × precio × factor del concepto × factor del presupuesto</b>, redondeado a centavos en cada renglón. El factor del concepto viene en el tabulador; el factor del presupuesto lo escribe quien arma el presupuesto (1.00 si no se cambia) para ajustar a Puebla precios de otro estado.</p>
+        <p>Los conceptos con unidad % (por ejemplo, proyecto ejecutivo o supervisión) se calculan sobre la suma de la obra del capítulo 6000 ya ajustada. No llevan factores, no entran en esa suma y llevan cantidad 1.</p>
+        <h3>Partidas</h3>
+        <p>Las partidas genéricas son del clasificador por objeto del gasto del CONAC. Las partidas específicas se toman del COGAPE de Puebla vigente (acuerdo de la SPF del 05/03/2026). Si el tabulador no trae la partida específica, se muestra <span class="pendiente">Pendiente COGAPE</span> y hay que asignarla antes de registrar el gasto.</p>
+        <h3>Presupuestos guardados</h3>
+        <p>Al guardar, el presupuesto copia los precios, factores y partidas de ese día, junto con la huella del tabulador. Si después cambia el tabulador, el presupuesto no cambia y se marca como “calculado con tabulador anterior”.</p>
+        <h3>Alcance</h3>
+        <p>PIANI prepara y prioriza la información para planear obra escolar. <b>No sustituye al sistema contable ni presupuestal del estado</b>, ni al proceso de contratación de obra pública: los montos se validan con el CAPCEE.</p>
+        <h3>Glosario</h3>
+        <dl class="glosario">
+          <dt>Partida genérica</dt><dd>Nivel del clasificador por objeto del gasto del CONAC que agrupa gastos del mismo tipo; se identifica con tres dígitos (por ejemplo, 612 Edificación no habitacional).</dd>
+          <dt>Partida específica</dt><dd>Nivel más detallado, debajo de la partida genérica, que define cada gobierno. En Puebla se toma del COGAPE.</dd>
+          <dt>COGAPE</dt><dd>Clasificador por objeto del gasto que usa el gobierno de Puebla; de él salen las partidas específicas.</dd>
+          <dt>CCT</dt><dd>Clave de Centro de Trabajo de la escuela: 10 caracteres; las de Puebla empiezan con 21 (por ejemplo, 21DPR1273G).</dd>
+          <dt>Factor regional</dt><dd>Multiplicador que ajusta un precio al lugar de la obra. Hay uno por concepto (en el tabulador) y uno por presupuesto.</dd>
+          <dt>Huella del tabulador</dt><dd>Código (SHA-256) que se calcula del archivo del tabulador. Cambia con cualquier cambio en el CSV y dice con qué versión se hizo cada presupuesto.</dd>
+        </dl>
+      </details>
       <details class="caja"><summary>Glosario</summary>
         <p><b>Geocerca:</b> zona dibujada en el mapa. <b>Expuestos:</b> población del censo dentro de la zona. <b>Confirmados:</b> personas registradas en albergues dentro de la zona. <b>Base:</b> punto de donde sale la ayuda. <b>Valor b:</b> pendiente de la ley de Gutenberg-Richter; indica la proporción de sismos grandes y pequeños.</p></details>
     </section>
