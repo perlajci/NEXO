@@ -69,7 +69,7 @@
   const pista = (txt) => { $('#pista').hidden = !txt; $('#pista').textContent = txt || ''; };
 
   // ---------- Navegación ----------
-  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'reportes', 'operacion', 'rutas', 'sismos', 'clima', 'ayuda'];
+  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'reportes', 'operacion', 'rutas', 'clima', 'ayuda'];
   function irA(sec) {
     if (!SECCIONES.includes(sec)) sec = 'inicio';
     st.sec = sec;
