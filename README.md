@@ -130,7 +130,7 @@ Desde el historial se puede **restaurar** una versión, también con clave y con
 
 ### Catálogo de planteles (opcional, `data/capcee/planteles.csv`)
 
-Todavía no existe. Cuando lo agregues, con al menos la columna `cct` y de preferencia `nombre`, `municipio`, `localidad`, `lat` y `lon` (UTF-8, una escuela por renglón), cada presupuesto con CCT se enlaza solo con su plantel en el campo `plantel`. No hay que reiniciar ni cambiar código: lo leen `cargarPlanteles` y `buscarPlantel` en `lib/presupuesto.js`.
+Todavía no existe; mientras tanto, el plantel se toma del catálogo de escuelas (`data/escuelas/`). Cuando lo agregues, con al menos la columna `cct` y de preferencia `nombre`, `municipio`, `localidad`, `lat` y `lon` (UTF-8, una escuela por renglón), cada presupuesto con CCT se enlaza solo con su plantel en el campo `plantel`. No hay que reiniciar ni cambiar código: lo leen `cargarPlanteles` y `buscarPlantel` en `lib/presupuesto.js`.
 
 ## Escuelas (`data/escuelas/*.csv`)
 
@@ -271,9 +271,21 @@ Pruebas del tabulador (40):
 | `test/presupuestos.test.js` | 10 | Almacén JSON, nombre del CSV, guardar y recuperar, recálculo que ignora totales falsos, rechazos, CSV (BOM, encabezado, partidas, totales), protección contra fórmulas en Excel, tabulador nuevo sin cambiar lo guardado, Recursos CAPCEE, borrar |
 | `test/tabulador-admin.test.js` | 12 | CSV válido y con errores (renglón y motivo, UTF-8, 1 MB), diferencias con $ y % y presupuestos que usan cada concepto, escritura atómica ante fallas, nombre del respaldo, clave (401/403), previsualizar sin aplicar, 409 si algo cambió, aplicar con respaldo sin reiniciar, historial y restaurar |
 
+Pruebas de escuelas (45):
+
+| Archivo | Pruebas | Qué cubre |
+|---|---|---|
+| `test/escuelas.test.js` | 12 | Lector SEP genérico, DENUE y CNCT (columnas reales); entidad 21 por clave o por nombre; solo planteles; CCT; coordenadas vacías, en 0 o fuera de Puebla; turnos en renglones y en columnas, inactivos aparte; nivel agrupado y su origen; “Sin dato” y “Ninguno” vacíos; domicilio; `decimales_coord` y ubicación aproximada; columnas no reconocidas; aviso sin archivo y carga sin reiniciar |
+| `test/escuelas-riesgo.test.js` | 9 | Localidad más cercana (rejilla igual a búsqueda completa); vulnerabilidad, distancia y municipio; peligro volcánico, sísmico y por mes en el punto de la escuela; filtros y resumen (alumnos solo con dato); `/api/escuelas`, `/resumen` y la ficha |
+| `test/escuelas-reportes.test.js` | 8 | Inmueble por coordenada y calle; validación del reporte; daño más grave verificado o “por verificar”; el reporte se aplica a todo el inmueble; trama con CCT o CCT:daño sin romper la anterior; API de reportes, verificación, historial y errores |
+| `test/escuelas-mapa.test.js` | 9 | Color = estado, borde = por verificar, hueco = ubicación dudosa; agrupación por celda y su rapidez; textos de la tarjeta de Inicio; abreviaturas de vialidad; correcciones de ubicación (validación, todo el inmueble, CSV sin tocar, deshacer) |
+| `test/escuelas-tabulador.test.js` | 7 | Grupos y orden de escuelas prioritarias por inmueble, con presupuesto o sin él y CONAFE opcional; foto de la escuela en el presupuesto y su bloque en el CSV; CSV de reportes; búsqueda de localidades a 2 km |
+
+Usan `test/fixture/escuelas/` (SEP, DENUE y CNCT con el encabezado real) y CSV armados dentro de cada prueba, con escuelas y CCT `21ZZZ…` inventadas.
+
 ## Despliegue en Render
 
-*Web Service*, start command `npm start`, sin build. Sube el CSV del censo y `data/cache/` ya llena. En el plan gratuito el disco se borra al reiniciar: los registros de `data/confirmaciones.json` se pierden (para algo más que una demo, usar una base de datos).
+*Web Service*, start command `npm start`, sin build. Sube el CSV del censo y `data/cache/` ya llena. El catálogo de escuelas de Puebla (`data/escuelas/escuelas_puebla.csv`, 11 MB) ya está en el repositorio; el nacional no (está en `.gitignore`). Las correcciones de ubicación (`data/escuelas/correcciones.json`) y los reportes de daño se borran al reiniciar, como los demás datos de operación. En el plan gratuito el disco se borra al reiniciar: los registros de `data/confirmaciones.json` se pierden (para algo más que una demo, usar una base de datos).
 
 > **Aviso: presupuestos guardados del Tabulador.** Se guardan en `data/presupuestos.json`, con la misma capa que Operación. **En el plan gratuito de Render el disco se borra al reiniciar y se pierden todos los presupuestos guardados.** Exporta a CSV los que necesites conservar. El guardado está detrás de una interfaz (`guardar`, `listar`, `obtener`, `borrar` en `lib/almacen.js`): para pasar a una base de datos basta con escribir otro objeto con esos cuatro métodos y cambiar una línea en `server.js`.
 
@@ -325,3 +337,4 @@ Pruebas del tabulador (40):
 - Los sismos no se predicen; la climatología usa 2020–2024 por los límites de la API gratuita.
 - El inicio de sesión usa una sola contraseña del equipo (`PIANI_CLAVE`), sin cuentas por persona: no queda registro de quién hizo cada cambio. `POST /api/lora/trama` sigue abierto para los ESP32, así que cualquiera en la red podría mandar un reporte; para uso real, conviene agregar una clave por dispositivo.
 - Privacidad: se guardan conteos por albergue, no datos personales.
+- **Escuelas:** el catálogo de la SEP (CNCT 2026) no trae alumnos, así que no se cuentan alumnos expuestos. 195 escuelas tienen coordenada aproximada (2 decimales o menos) y 1,252 CCT usan coordenadas que comparten 3 o más inmuebles de calles distintas (probables puntos genéricos). “En peligro” es una estimación del modelo; solo los reportes de campo dicen si hay daño. El inmueble se arma con coordenada y calle: dos escuelas del mismo edificio con la calle escrita muy distinto quedan como inmuebles separados.

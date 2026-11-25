@@ -524,8 +524,25 @@
         <p><b>Riesgo = Peligro × (0.5 + 0.5 × Vulnerabilidad).</b> Niveles: bajo &lt;0.2, medio &lt;0.4, alto &lt;0.6, muy alto ≥0.6. Es un índice relativo para priorizar, no el Atlas Nacional de Riesgos.</p></details>
       <details class="caja"><summary>¿Cómo se proponen los albergues?</summary>
         <p>Modelo de cobertura máxima: se eligen, una por una, las localidades con peligro bajo (≤0.4) y suficientes habitantes que alcanzan, dentro de la distancia indicada, a más personas en riesgo, ponderadas por vulnerabilidad. La capacidad sugerida es la población cubierta por el porcentaje que usaría albergue. Hay que verificar en campo el inmueble, su estructura y los accesos.</p></details>
+      <details class="caja" id="ayudaEscuelas"><summary>Escuelas: en peligro y afectadas</summary>
+        <h3>Dos cosas distintas</h3>
+        <ul>
+          <li><b>En peligro</b> es una <b>estimación del modelo</b>: la escuela tiene riesgo alto o muy alto con el fenómeno y el mes elegidos arriba. Se calcula con el peligro en el punto de la escuela y la vulnerabilidad de la localidad del censo más cercana. Cambia si cambias el escenario. No dice que la escuela esté dañada.</li>
+          <li><b>Afectada</b> es un <b>dato de campo</b>: alguien reportó daño leve, moderado, grave o inhabitable (desde Reportes, desde la ficha del mapa o desde un nodo ESP32). No depende del escenario. Mientras nadie lo confirme, el daño está <b>por verificar</b> (borde de rayas en el mapa).</li>
+        </ul>
+        <p>Una escuela puede ser las dos cosas; en el mapa manda el color de afectada. Un reporte en una CCT se aplica a todas las CCT del mismo inmueble (misma coordenada y misma calle). El daño de la escuela es el más grave entre los reportes verificados.</p>
+        <h3>¿De dónde salen las escuelas y sus coordenadas?</h3>
+        <p>Del <b>Catálogo Nacional de Centros de Trabajo (CNCT) 2026 de la SEP</b>, recortado a Puebla: escuelas, planteles de media superior, albergues escolares y centros CONAFE de educación inicial. La latitud y la longitud son las que la SEP registra para el inmueble. El catálogo no trae número de alumnos, por eso “alumnos expuestos” dice “Sin dato”.</p>
+        <h3>¿Qué tan precisa es la ubicación?</h3>
+        <ul>
+          <li><b>Decimales de la coordenada:</b> 4 o más ≈ 11 m o mejor; 3 ≈ 110 m; 2 o menos ≈ 1 km o más. Las de 2 o menos se marcan como <b>ubicación aproximada</b>. Esto dice qué tan fino está escrito el dato, no si la escuela está realmente ahí.</li>
+          <li><b>Coordenada compartida:</b> si 3 o más inmuebles de calles distintas tienen exactamente la misma coordenada, probablemente es un punto genérico (por ejemplo, el centro de la localidad).</li>
+          <li>En los dos casos el cuadro se ve <b>hueco</b> en el mapa y la ficha dice cuál de las dos es. Si conoces la ubicación correcta, usa “Corregir ubicación” en la ficha: se guarda aparte, sin cambiar el catálogo, y la coordenada queda con fuente “manual”.</li>
+          <li>Si la localidad del censo más cercana está a más de 5 km, la vulnerabilidad de esa escuela es solo <b>referencial</b>.</li>
+        </ul>
+      </details>
       <details class="caja"><summary>Limitaciones</summary>
-        <ul><li>El censo cuenta dónde vive la gente, no dónde está a cada hora, y es de 2020.</li><li>Las localidades pequeñas tienen datos reservados por el INEGI: los conteos de grupos son un mínimo.</li><li>Los sismos no se predicen: se muestran frecuencias históricas.</li><li>Las rutas no conocen los cierres causados por el desastre.</li></ul></details>
+        <ul><li>El censo cuenta dónde vive la gente, no dónde está a cada hora, y es de 2020.</li><li>Escuelas: el catálogo de la SEP no trae alumnos, y algunas coordenadas son aproximadas o genéricas. “En peligro” es una estimación; solo los reportes de campo dicen si hay daño.</li><li>Las localidades pequeñas tienen datos reservados por el INEGI: los conteos de grupos son un mínimo.</li><li>Los sismos no se predicen: se muestran frecuencias históricas.</li><li>Las rutas no conocen los cierres causados por el desastre.</li></ul></details>
       <details class="caja ayuda-tab" id="ayudaTabulador"><summary>Tabulador y presupuestos</summary>
         <h3>¿De dónde salen los precios?</h3>
         <p>Cada concepto lleva una etiqueta con su tipo de dato; al pasar el cursor o tocarla se ve la fuente exacta.</p>
