@@ -9,7 +9,8 @@
     "start": "node server.js",
     "preparar": "node scripts/preparar-datos.js",
     "test": "node --test test/*.test.js",
-    "lora:simular": "node scripts/simular-lora.js"
+    "lora:simular": "node scripts/simular-lora.js",
+    "puente:usb": "powershell -ExecutionPolicy Bypass -File scripts/puente-usb.ps1"
   },
   "license": "MIT"
 }

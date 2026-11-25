@@ -89,4 +89,8 @@ test('trama por API: crea, actualiza y bases no cuentan como confirmados', async
   const pub = await get('/api/albergues/publicos');
   assert.equal(pub.j.albergues.length, 1);
   assert.equal(pub.j.albergues[0].nota, undefined);
+  const r1 = await post('/api/lora/trama', { trama: 'R|Esc Primaria|3||19.04|-98.41|ag,am|Techo danado', rssi: -62, via: 'espnow', puerta: 'USB-COM3' });
+  assert.equal(r1.s, 201);
+  assert.equal(r1.j.tipo, 'reporte');
+  assert.match(r1.j.nota, /Techo danado.*ESPNOW.*RSSI -62/);
 });

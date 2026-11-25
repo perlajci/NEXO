@@ -29,7 +29,9 @@
     meta: null, sec: 'inicio', modo: 'circulo', geocerca: null, vertices: [], ultimo: null,
     ubicando: false, rutaMarcando: null, ruta: { origen: null, destino: null }, punto: null,
     resumen: {}, munOrden: 'riesgo', conf: [], filtroConf: 'todos',
+    repFiltro: 'todos', repConRiesgo: false,
   };
+  let marcadoresConf = new Map();
   const escenario = () => ({ fenomeno: $('#fFenomeno').value, mes: Number($('#fMes').value) });
   const claveEsc = () => { const e = escenario(); return `${e.fenomeno}-${e.mes}`; };
 
@@ -42,11 +44,19 @@
   for (const k of ['loc', 'geo', 'vert', 'conf', 'popo', 'mun', 'alb', 'ruta', 'sis', 'punto']) capas[k] = L.layerGroup();
   const CAPAS_SEC = {
     inicio: ['loc', 'popo', 'conf'], riesgo: ['loc', 'popo', 'conf'], contar: ['loc', 'geo', 'vert', 'conf'],
-    municipios: ['mun', 'geo'], albergues: ['loc', 'alb'], operacion: ['loc', 'geo', 'conf'],
+    municipios: ['mun', 'geo'], albergues: ['loc', 'alb'], reportes: ['conf'], operacion: ['loc', 'geo', 'conf'],
     rutas: ['conf', 'ruta'], sismos: ['sis', 'punto', 'geo'], clima: ['punto', 'geo'], ayuda: ['loc'],
   };
+  function pintarLeyenda() {
+    if (st.sec === 'reportes' && !st.repConRiesgo) {
+      $('#leyenda').innerHTML = Object.entries(NOM_TIPO).map(([k, v]) => `<span><i style="background:${COLOR_TIPO[k]}"></i>${v}</span>`).join('');
+    } else {
+      $('#leyenda').innerHTML = NIV_ORDEN.map((n) => `<span><i style="background:${COLOR[n]}"></i>${NOM_NIV[n]}</span>`).join('');
+    }
+  }
   function mostrarCapas(sec) {
     const quiero = new Set(CAPAS_SEC[sec] || []);
+    if (sec === 'reportes' && st.repConRiesgo) { quiero.add('loc'); quiero.add('popo'); }
     if (sec === 'riesgo' || sec === 'inicio') {
       if (!$('#capaPopo').checked) quiero.delete('popo');
       if (!$('#capaPuntos').checked) quiero.delete('conf');
@@ -54,11 +64,12 @@
     for (const [k, c] of Object.entries(capas)) {
       if (quiero.has(k)) c.addTo(mapa); else mapa.removeLayer(c);
     }
+    pintarLeyenda();
   }
   const pista = (txt) => { $('#pista').hidden = !txt; $('#pista').textContent = txt || ''; };
 
   // ---------- Navegación ----------
-  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'operacion', 'rutas', 'sismos', 'clima', 'ayuda'];
+  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'reportes', 'operacion', 'rutas', 'sismos', 'clima', 'ayuda'];
   function irA(sec) {
     if (!SECCIONES.includes(sec)) sec = 'inicio';
     st.sec = sec;
@@ -67,12 +78,14 @@
     document.body.classList.toggle('ancho', sec === 'municipios');
     st.ubicando = false; st.rutaMarcando = null;
     pista(sec === 'contar' && !st.geocerca ? 'Da clic en el mapa para poner el centro de la zona' : '');
+    pintarMarcadoresConf();
     mostrarCapas(sec);
     $('#panel').scrollTop = 0;
     if (location.hash !== `#${sec}`) history.replaceState(null, '', `#${sec}`);
     setTimeout(() => mapa.invalidateSize && mapa.invalidateSize(), 50);
     if (sec === 'riesgo' || sec === 'inicio') cargarResumen().then(pintarRiesgo).catch(() => {});
     if (sec === 'municipios') cargarResumen().then(pintarMunicipios).catch(() => {});
+    if (sec === 'reportes') { cargarConfirmaciones().then(() => { pintarReportes(); centrarReportes(); }); }
     if (sec === 'operacion' || sec === 'rutas') cargarConfirmaciones();
     if (sec === 'sismos' || sec === 'clima') textoCentro();
   }
@@ -539,17 +552,151 @@
     const nec = Object.entries(o.necesidades).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${NOM_NEC[k] || k} (${n})`);
     $('#oNec').textContent = o.puntos ? `${o.puntos} albergues o reportes dentro de la zona. Necesidades: ${nec.join(', ') || 'ninguna'}.` : 'Aún no hay albergues ni reportes dentro de la zona.';
   }
-  async function cargarConfirmaciones() {
-    st.conf = await api('/api/confirmaciones').catch(() => []);
-    capas.conf.clearLayers();
-    for (const c of st.conf) {
-      L.circleMarker([c.lat, c.lon], { radius: 8, weight: 3, color: '#fff', fillColor: COLOR_TIPO[c.tipo] || '#555', fillOpacity: 1 })
-        .bindPopup(`<strong>${esc(c.nombre)}</strong><br>${NOM_TIPO[c.tipo] || ''} · ${esc(c.fuente)}<br>${c.tipo === 'base' ? '' : `${fmt(c.personas)} personas${c.capacidad ? ` de ${fmt(c.capacidad)}` : ''}<br>`}${esc(c.necesidades.map((n) => NOM_NEC[n] || n).join(', '))}`)
-        .addTo(capas.conf);
-    }
-    listaConfirmaciones();
-    $('#rtBases').innerHTML = `<option value="">—</option>${st.conf.filter((c) => c.tipo === 'base').map((c) => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('')}`;
+  function centrarReportes() {
+    const pts = st.conf.map((c) => [c.lat, c.lon]);
+    if (!pts.length) return;
+    if (pts.length === 1) mapa.setView(pts[0], 13);
+    else mapa.fitBounds(pts, { padding: [50, 50], maxZoom: 13 });
   }
+  function pintarMarcadoresConf() {
+    capas.conf.clearLayers();
+    marcadoresConf = new Map();
+    const enReportes = st.sec === 'reportes';
+    const letra = { reporte: 'R', albergue: 'A', base: 'B' };
+    for (const c of st.conf) {
+      const color = COLOR_TIPO[c.tipo] || '#555';
+      const popup = `<strong>${esc(c.nombre)}</strong><br>${NOM_TIPO[c.tipo] || ''} · ${c.fuente === 'lora' ? 'Red ESP32' : esc(c.fuente)}<br>${c.tipo === 'base' ? '' : `${fmt(c.personas)} personas${c.capacidad ? ` de ${fmt(c.capacidad)}` : ''}<br>`}${c.necesidades.length ? `Insumos: ${esc(c.necesidades.map((n) => NOM_NEC[n] || n).join(', '))}<br>` : ''}${c.nota ? `<small>${esc(c.nota)}</small>` : ''}`;
+      const icono = L.divIcon({ className: 'pinRep', html: `<span style="background:${color}">${letra[c.tipo] || '•'}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
+      const m = L.marker([c.lat, c.lon], { icon: icono, zIndexOffset: 900 }).bindPopup(popup);
+      if (enReportes) m.bindTooltip(esc(c.nombre), { permanent: true, direction: 'top', offset: [0, -14], className: 'etiqRep' });
+      m.addTo(capas.conf);
+      marcadoresConf.set(c.id, m);
+    }
+  }
+  function pintarReportes() {
+    const tot = st.conf.length;
+    const esp = st.conf.filter((c) => c.fuente === 'lora').length;
+    const pers = st.conf.filter((c) => c.tipo !== 'base').reduce((a, c) => a + (c.personas || 0), 0);
+    const ult = st.conf.length ? new Date(st.conf[st.conf.length - 1].fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '–';
+    const badge = $('#badgeRep');
+    if (badge) { badge.hidden = tot === 0; badge.textContent = String(tot); }
+    const iRep = $('#iRepTxt');
+    if (iRep) iRep.textContent = tot ? `${fmt(tot)} registros (${fmt(pers)} personas · ${fmt(esp)} vía ESP32)` : 'Aún no hay reportes recibidos';
+
+    const kpis = $('#repKpis');
+    if (kpis) {
+      kpis.innerHTML = `
+        <div><b>${fmt(tot)}</b><small>reportes y puntos activos</small></div>
+        <div><b>${fmt(pers)}</b><small>personas reportadas</small></div>
+        <div><b>${fmt(esp)}</b><small>recibidos por red ESP32</small></div>
+        <div><b>${esc(ult)}</b><small>último reporte</small></div>`;
+    }
+    const conteoNec = {};
+    for (const c of st.conf) for (const n of c.necesidades || []) conteoNec[n] = (conteoNec[n] || 0) + 1;
+    const necOrden = Object.entries(conteoNec).sort((a, b) => b[1] - a[1]);
+    const necEl = $('#repNec');
+    if (necEl) necEl.innerHTML = necOrden.length ? necOrden.map(([k, n]) => `<span>${esc(NOM_NEC[k] || k)}: ${n}</span>`).join('') : '';
+
+    const filtrados = st.conf.filter((c) => {
+      if (st.repFiltro === 'todos') return true;
+      if (st.repFiltro === 'lora') return c.fuente === 'lora';
+      return c.tipo === st.repFiltro;
+    }).slice().reverse();
+    const cont = $('#listaReportes');
+    if (!cont) return;
+    cont.innerHTML = filtrados.length ? filtrados.map((c) => `
+      <article class="rep-card ${esc(c.tipo)}">
+        <div class="rep-top">
+          <h3>${esc(c.nombre)}</h3>
+          <span class="etq" style="border-color:${COLOR_TIPO[c.tipo]}">${NOM_TIPO[c.tipo] || ''}</span>
+        </div>
+        <div class="rep-meta">
+          ${c.fuente === 'lora' ? '<span class="rep-badge esp">ESP32 · Sin internet</span>' : `<span class="rep-badge">${esc(c.fuente)}</span>`}
+          ${c.tipo === 'base' ? '' : `<strong>${fmt(c.personas)} personas${c.capacidad ? ` / ${fmt(c.capacidad)}` : ''}</strong>`}
+          <span class="nota">${esc(new Date(c.fecha).toLocaleString('es-MX'))}</span>
+        </div>
+        ${c.necesidades?.length ? `<div class="rep-chips">${c.necesidades.map((n) => `<span>${esc(NOM_NEC[n] || n)}</span>`).join('')}</div>` : ''}
+        ${c.nota ? `<p class="nota">${esc(c.nota)}</p>` : ''}
+        <div class="rep-acciones">
+          <button type="button" class="primario" data-ver="${esc(c.id)}">Ver en mapa</button>
+          <button type="button" data-ruta-rep="${esc(c.id)}">Trazar ruta</button>
+          <button type="button" data-borrar-rep="${esc(c.id)}">Quitar</button>
+        </div>
+      </article>`).join('') : '<div class="vacio">No hay reportes en este filtro. Envía uno desde el celular conectado al ESP32 y aparecerá aquí al instante.</div>';
+  }
+
+  let ultimaFirmaConf = '';
+  let avisoTimer = null;
+  async function cargarConfirmaciones({ soloSiCambio = false } = {}) {
+    const nueva = await api('/api/confirmaciones').catch(() => null);
+    if (!nueva) return;
+    const firma = JSON.stringify(nueva);
+    if (soloSiCambio && firma === ultimaFirmaConf) return;
+    const idsPrev = new Set(st.conf.map((x) => x.id));
+    const entrante = soloSiCambio ? nueva.find((x) => !idsPrev.has(x.id)) || nueva[nueva.length - 1] : null;
+    ultimaFirmaConf = firma;
+    st.conf = nueva;
+    pintarMarcadoresConf();
+    listaConfirmaciones();
+    pintarReportes();
+    const selBase = $('#rtBases').value;
+    $('#rtBases').innerHTML = `<option value="">—</option>${st.conf.filter((c) => c.tipo === 'base').map((c) => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('')}`;
+    if (selBase) $('#rtBases').value = selBase;
+    if (soloSiCambio && st.geo) calcular();
+    if (entrante) {
+      pista(`Nuevo ${NOM_TIPO[entrante.tipo] || 'registro'} recibido: ${entrante.nombre} (${fmt(entrante.personas)} personas)`);
+      if (avisoTimer) clearTimeout(avisoTimer);
+      avisoTimer = setTimeout(() => pista(''), 8000);
+      const m = marcadoresConf.get(entrante.id);
+      if (m && mapa.hasLayer(capas.conf)) {
+        mapa.panTo([entrante.lat, entrante.lon]);
+        m.openPopup();
+      }
+    }
+  }
+  setInterval(() => cargarConfirmaciones({ soloSiCambio: true }), 3000);
+
+  $('#repSolo').onclick = () => {
+    st.repConRiesgo = false;
+    $('#repSolo').classList.add('activo'); $('#repConRiesgo').classList.remove('activo');
+    mostrarCapas('reportes');
+  };
+  $('#repConRiesgo').onclick = () => {
+    st.repConRiesgo = true;
+    $('#repConRiesgo').classList.add('activo'); $('#repSolo').classList.remove('activo');
+    mostrarCapas('reportes');
+  };
+  $('#btnCentrarRep').onclick = () => centrarReportes();
+  $$('[data-rep-filtro]').forEach((b) => b.addEventListener('click', () => {
+    st.repFiltro = b.dataset.repFiltro;
+    $$('[data-rep-filtro]').forEach((x) => x.classList.toggle('activo', x === b));
+    pintarReportes();
+  }));
+  $('#listaReportes').addEventListener('click', async (ev) => {
+    const verId = ev.target.closest('[data-ver]')?.dataset.ver;
+    if (verId) {
+      const c = st.conf.find((x) => x.id === verId);
+      const m = marcadoresConf.get(verId);
+      if (c) { mapa.setView([c.lat, c.lon], 13); if (m) m.openPopup(); }
+      return;
+    }
+    const rutaId = ev.target.closest('[data-ruta-rep]')?.dataset.rutaRep;
+    if (rutaId) {
+      const c = st.conf.find((x) => x.id === rutaId);
+      if (c) {
+        st.ruta.destino = { lat: c.lat, lon: c.lon, nombre: c.nombre };
+        irA('rutas');
+        pintarPuntosRuta();
+      }
+      return;
+    }
+    const delId = ev.target.closest('[data-borrar-rep]')?.dataset.borrarRep;
+    if (delId) {
+      await api(`/api/confirmaciones/${encodeURIComponent(delId)}`, { method: 'DELETE' }).catch(() => null);
+      await cargarConfirmaciones();
+      if (st.geo) calcular();
+    }
+  });
   function listaConfirmaciones() {
     const lista = st.conf.filter((c) => st.filtroConf === 'todos' || c.tipo === st.filtroConf).slice().reverse();
     $('#listaConf').innerHTML = lista.length

@@ -40,7 +40,8 @@ a{color:var(--accent)}
 .app{flex:1;display:grid;grid-template-columns:88px 420px minmax(0,1fr);min-height:0}
 body.ancho .app{grid-template-columns:88px minmax(0,58%) minmax(0,1fr)}
 .riel{background:var(--riel);display:flex;flex-direction:column;padding:6px 0;overflow-y:auto}
-.riel button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;color:var(--rielInk);font-size:11.5px;line-height:1.15;text-align:center;border-left:3px solid transparent;transition:background-color .15s}
+.riel button{all:unset;position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;color:var(--rielInk);font-size:11.5px;line-height:1.15;text-align:center;border-left:3px solid transparent;transition:background-color .15s}
+.riel .conteo{position:absolute;top:5px;right:8px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#e3742b;color:#fff;font-style:normal;font-size:11px;font-weight:800;line-height:19px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .riel button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .riel button:hover{background:rgba(255,255,255,.08)}
 .riel button.activo{background:rgba(25,195,207,.16);border-left-color:var(--rielMarca);color:#fff;font-weight:700}
@@ -137,6 +138,24 @@ tbody tr.clic{cursor:pointer}tbody tr.clic:hover{background:var(--panel2)}
 .sitio .num,.numIcono b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accentInk);font-size:13px;font-weight:700;flex:none}
 .numIcono{background:none;border:0}.numIcono b{border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .sitio .fila button{min-height:34px;font-size:13px}
+.rep-lista{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.rep-card{border:1px solid var(--line);border-left:5px solid #e3742b;border-radius:12px;padding:12px 13px;background:var(--panel2);box-shadow:0 1px 4px rgba(11,42,85,.06)}
+.rep-card.albergue{border-left-color:#2f8f5b}.rep-card.base{border-left-color:#1f5fbf}
+.rep-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.rep-card h3{margin:0;font-size:15.5px;line-height:1.25;font-weight:800}
+.rep-meta{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;align-items:center}
+.rep-badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--accentSoft);color:var(--accent)}
+.rep-badge.esp{background:#fff1e6;color:#b84b0f;border:1px solid #f4c6a5}
+.rep-chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.rep-chips span{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
+.rep-nec-resumen{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.rep-nec-resumen span{font-size:12.5px;font-weight:600;padding:4px 9px;border-radius:99px;background:var(--panel2);border:1px solid var(--line)}
+.rep-acciones{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.rep-acciones button{min-height:32px;padding:4px 10px;font-size:12.5px;flex:1 1 auto}
+.pinRep{background:none;border:0}
+.pinRep span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:#fff;font:800 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.4)}
+.leaflet-tooltip.etiqRep{background:var(--marino);color:#fff;border:0;border-radius:6px;padding:3px 7px;font:700 12px/1.2 "Plus Jakarta Sans",system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+.leaflet-tooltip.etiqRep::before{border-top-color:var(--marino)}
 .ruta-paso{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
 .volver{margin-bottom:10px}
 .cols{display:flex;align-items:flex-end;gap:2px;height:110px;border-bottom:1px solid var(--line);margin-top:6px}

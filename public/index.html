@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -31,6 +31,7 @@
     <button data-sec="contar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg><span>Contar población</span></button>
     <button data-sec="municipios"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Municipios</span></button>
     <button data-sec="albergues"><svg viewBox="0 0 24 24"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg><span>Albergues sugeridos</span></button>
+    <button data-sec="reportes"><svg viewBox="0 0 24 24"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></svg><span>Reportes</span><em class="conteo" id="badgeRep" hidden>0</em></button>
     <button data-sec="operacion"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg><span>Operación</span></button>
     <button data-sec="rutas"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg><span>Rutas</span></button>
     <button data-sec="sismos"><svg viewBox="0 0 24 24"><path d="M2 12h4l2-5 3 10 3-14 3 9 2-3h3"/></svg><span>Sismos</span></button>
@@ -63,6 +64,11 @@
         <button type="button" data-ir="operacion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg>Operación</button>
         <button type="button" data-ir="rutas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg>Rutas</button>
       </nav>
+
+      <a class="publica rep-acceso" href="#reportes" data-ir="reportes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></svg>
+        <span><b>Reportes en vivo (Red ESP32 / LoRa)</b><small id="iRepTxt">Ver reportes recibidos en el mapa</small></span>
+      </a>
 
       <a class="publica" href="cerca.html" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
@@ -185,6 +191,30 @@
       <div id="aRes"></div>
     </section>
 
+    <!-- REPORTES EN VIVO -->
+    <section class="sec" data-sec="reportes" hidden>
+      <h1>Reportes en vivo</h1>
+      <div class="como"><b>Red de emergencia</b> Aquí aparecen al instante los reportes enviados desde los nodos ESP32 / LoRa y albergues. Cambia la vista del mapa para ver solo los reportes o combinarlos con el mapa de riesgo.</div>
+      <div class="segmento" role="group" aria-label="Vista del mapa">
+        <button type="button" id="repSolo" class="activo">Solo reportes en el mapa</button>
+        <button type="button" id="repConRiesgo">Con mapa de riesgo</button>
+      </div>
+      <div id="repKpis" class="kpis"></div>
+      <div class="fila">
+        <button type="button" id="btnCentrarRep" class="primario">Centrar mapa en reportes</button>
+        <button type="button" data-ir="operacion">Ir a Operación</button>
+      </div>
+      <div id="repNec" class="rep-nec-resumen"></div>
+      <h2>Reportes recibidos</h2>
+      <div class="segmento chico" role="group" aria-label="Filtrar reportes">
+        <button type="button" data-rep-filtro="todos" class="activo">Todos</button>
+        <button type="button" data-rep-filtro="lora">Red ESP32</button>
+        <button type="button" data-rep-filtro="reporte">Emergencias</button>
+        <button type="button" data-rep-filtro="albergue">Albergues</button>
+      </div>
+      <div id="listaReportes" class="rep-lista"></div>
+    </section>
+
     <!-- OPERACIÓN -->
     <section class="sec" data-sec="operacion" hidden>
       <h1>Operación en emergencia</h1>
@@ -196,8 +226,11 @@
       </div>
       <div class="progreso" aria-hidden="true"><i id="oBarra"></i></div>
       <p id="oNec" class="nota">Dibuja una zona en “Contar población” para ver estas cifras.</p>
-      <details class="caja" open>
-        <summary>Registrar punto</summary>
+      <h2>Puntos registrados</h2>
+      <div class="segmento chico" role="group"><button type="button" data-filtro="todos" class="activo">Todos</button><button type="button" data-filtro="albergue">Albergues</button><button type="button" data-filtro="base">Bases</button><button type="button" data-filtro="reporte">Reportes</button></div>
+      <ul id="listaConf" class="lista"></ul>
+      <details class="caja">
+        <summary>Registrar punto manualmente</summary>
         <form id="formConf" class="form">
           <div class="fila">
             <label>Tipo<select name="tipo"><option value="albergue">Albergue</option><option value="base">Base de respuesta (ambulancias, Protección Civil)</option><option value="reporte">Reporte de brigada</option></select></label>
@@ -219,9 +252,6 @@
           <p id="formMsg" class="nota" aria-live="polite"></p>
         </form>
       </details>
-      <h2>Puntos registrados</h2>
-      <div class="segmento chico" role="group"><button type="button" data-filtro="todos" class="activo">Todos</button><button type="button" data-filtro="albergue">Albergues</button><button type="button" data-filtro="base">Bases</button><button type="button" data-filtro="reporte">Reportes</button></div>
-      <ul id="listaConf" class="lista"></ul>
       <p class="nota">Se guardan conteos por albergue, no datos personales. Los nodos ESP32 envían estos mismos registros (ver docs/propuesta-lora.md).</p>
     </section>
 
@@ -311,7 +341,7 @@
   </section>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="vendor/leaflet.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -403,14 +403,15 @@ async function api(req, res, url) {
     let extra = {};
     try { const j = JSON.parse(cuerpo); if (j && typeof j === 'object') { trama = j.trama; extra = j; } } catch { /* texto plano */ }
     const p = parsearTrama(trama);
-    const via = ['wifi', 'lora'].includes(extra.via) ? extra.via : 'lora';
+    const via = ['wifi', 'lora', 'espnow'].includes(extra.via) ? extra.via : 'lora';
+    const meta = `Nodo ESP32 por ${via.toUpperCase()} (${p.bytes} bytes${Number.isFinite(Number(extra.rssi)) ? `, RSSI ${Number(extra.rssi)} dBm` : ''}${extra.puerta ? `, puerta ${String(extra.puerta).slice(0, 30)}` : ''})`;
     const c = validarConfirmacion({
       ...p, fuente: 'lora',
-      nota: `Nodo ESP32 por ${via.toUpperCase()} (${p.bytes} bytes${Number.isFinite(Number(extra.rssi)) ? `, RSSI ${Number(extra.rssi)} dBm` : ''}${extra.puerta ? `, puerta ${String(extra.puerta).slice(0, 30)}` : ''})`,
+      nota: p.nota ? `${p.nota} · ${meta}` : meta,
     });
     const lista = leerConfirmaciones();
-    // Un nodo reenvía su estado: si ya existe un registro con el mismo nombre y fuente lora, se actualiza.
-    const i = lista.findIndex((x) => x.fuente === 'lora' && x.nombre === c.nombre && x.tipo === c.tipo);
+    // Un albergue o base actualiza su estado por nombre; los reportes de emergencia se agregan como entradas nuevas.
+    const i = c.tipo === 'reporte' ? -1 : lista.findIndex((x) => x.fuente === 'lora' && x.nombre === c.nombre && x.tipo === c.tipo);
     if (i >= 0) lista[i] = { ...c, id: lista[i].id }; else lista.push(c);
     guardarConfirmaciones(lista);
     return enviar(res, i >= 0 ? 200 : 201, i >= 0 ? lista[i] : c);
