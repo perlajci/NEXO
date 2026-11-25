@@ -16,10 +16,13 @@
 #include <esp_wifi.h>
 
 // ---- Configuración (debe coincidir el CANAL_WIFI con el ESP32 #2) ----
-const char*   AP_SSID    = "NEXO-Albergue";
-const char*   AP_PASS    = "";   // red abierta para conexión rápida en la demo
-const uint8_t CANAL_WIFI = 1;    // ¡Mismo canal que el receptor ESP-NOW!
-const int     LED_PIN    = 2;
+const char*   AP_SSID       = "NEXO-Albergue";
+const char*   AP_PASS       = "";     // red abierta para conexión rápida en la demo
+const uint8_t CANAL_WIFI    = 1;      // ¡Mismo canal que el receptor ESP-NOW!
+const int     LED_PIN       = 2;      // LED azul integrado en la placa
+const int     LED_EXT_PIN   = 25;     // LED externo (con resistencia de 220-330 ohm a GND)
+const int     BUZZER_PIN    = 26;     // Buzzer (+ a GPIO 26, - a GND)
+const bool    BUZZER_ACTIVO = false;  // false = buzzer PASIVO (recomendado), true = buzzer ACTIVO
 
 // Broadcast: llega a cualquier ESP32 #2 escuchando en CANAL_WIFI sin copiar MAC.
 // Si prefieres fijar un receptor específico, cambia estos 6 bytes por la MAC del ESP32 #2.
@@ -28,13 +31,60 @@ uint8_t MAC_DESTINO[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 DNSServer dnsServer;
 WebServer server(80);
 unsigned long reportesEnviados = 0;
+volatile bool ackRecibido = false;
+unsigned long ledApagarEn = 0;
+
+void fijarLed(bool encendido) {
+  digitalWrite(LED_PIN, encendido ? HIGH : LOW);
+  digitalWrite(LED_EXT_PIN, encendido ? HIGH : LOW);
+}
+
+void sonar(int freqHz, int duracionMs) {
+  if (BUZZER_ACTIVO) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(duracionMs);
+    digitalWrite(BUZZER_PIN, LOW);
+  } else {
+    tone(BUZZER_PIN, freqHz, duracionMs);
+    delay(duracionMs);
+    noTone(BUZZER_PIN);
+  }
+}
 
 void parpadear(int veces = 2) {
   for (int i = 0; i < veces; i++) {
-    digitalWrite(LED_PIN, HIGH); delay(90);
-    digitalWrite(LED_PIN, LOW);  delay(70);
+    fijarLed(true);  delay(90);
+    fijarLed(false); delay(70);
   }
 }
+
+void sonidoConfirmado() {
+  // Doble tono ascendente alegre + LED encendido 2 segundos
+  fijarLed(true);
+  sonar(1500, 110);
+  delay(60);
+  sonar(2100, 180);
+  ledApagarEn = millis() + 2000;
+}
+
+void sonidoSinConfirmacion() {
+  // Tono grave de aviso si el receptor no respondió ACK
+  fijarLed(true);
+  sonar(450, 320);
+  fijarLed(false);
+}
+
+#if defined(ESP_ARDUINO_VERSION) && ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+void alRecibirAck(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
+  (void)info;
+  if (len >= 3 && data[0] == 'A' && data[1] == 'C' && data[2] == 'K') ackRecibido = true;
+}
+#else
+void alRecibirAck(const uint8_t* mac, const uint8_t* data, int len) {
+  (void)mac;
+  if (len >= 3 && data[0] == 'A' && data[1] == 'C' && data[2] == 'K') ackRecibido = true;
+}
+#endif
 
 // Limpia caracteres que podrían romper la trama separada por "|"
 String limpiar(String s, size_t maxLen) {
@@ -47,20 +97,36 @@ String limpiar(String s, size_t maxLen) {
   return s;
 }
 
-bool enviarEspNow(const String& trama) {
-  if (trama.length() == 0 || trama.length() > 240) return false;
+// Devuelve: 0 = error de envío, 1 = enviado sin ACK, 2 = enviado y CONFIRMADO por el receptor
+int enviarEspNow(const String& trama) {
+  if (trama.length() == 0 || trama.length() > 240) return 0;
+  ackRecibido = false;
+  fijarLed(true);
   esp_err_t res = esp_now_send(MAC_DESTINO, (const uint8_t*)trama.c_str(), trama.length());
   Serial.print("[ESP-NOW] (");
   Serial.print(trama.length());
   Serial.print(" bytes) ");
   Serial.print(trama);
-  Serial.println(res == ESP_OK ? " -> ENVIADO" : " -> ERROR");
-  if (res == ESP_OK) {
-    reportesEnviados++;
-    parpadear(2);
-    return true;
+  if (res != ESP_OK) {
+    Serial.println(" -> ERROR");
+    sonidoSinConfirmacion();
+    return 0;
   }
-  return false;
+  reportesEnviados++;
+  sonar(1200, 80); // 1 pitido corto: reporte emitido
+  // Espera hasta 700 ms el acuse de recibo ("ACK") del ESP32 #2 (Protección Civil)
+  unsigned long inicio = millis();
+  while (!ackRecibido && millis() - inicio < 700) delay(10);
+
+  if (ackRecibido) {
+    Serial.println(" -> ENVIADO Y CONFIRMADO (ACK)");
+    sonidoConfirmado();
+    return 2;
+  } else {
+    Serial.println(" -> ENVIADO (sin ACK del receptor)");
+    sonidoSinConfirmacion();
+    return 1;
+  }
 }
 
 const char PAGINA_FORM[] PROGMEM = R"HTML(<!doctype html>
@@ -224,15 +290,21 @@ void manejarEnvio() {
   if (nota.length() > 0) trama += "|" + nota;
   if (trama.length() > 235) trama = trama.substring(0, 235);
 
-  bool ok = enviarEspNow(trama);
+  int estadoEnvio = enviarEspNow(trama);
 
   String html = F("<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
                   "<title>NEXO · Enviado</title><style>body{font-family:system-ui,sans-serif;background:#0f172a;color:#f8fafc;padding:20px}"
                   ".box{max-width:440px;margin:20px auto;background:#1e293b;padding:20px;border-radius:14px}"
                   "code{display:block;background:#0f172a;padding:10px;border-radius:8px;word-break:break-all;font-size:.82rem;color:#7dd3fc}"
                   "a{display:block;text-align:center;margin-top:16px;padding:12px;background:#0284c7;color:#fff;text-decoration:none;border-radius:10px;font-weight:700}</style></head><body><div class='box'>");
-  html += ok ? F("<h2 style='color:#4ade80;margin-top:0'>Reporte enviado sin internet</h2>")
-             : F("<h2 style='color:#f87171;margin-top:0'>No se pudo transmitir por ESP-NOW</h2>");
+  if (estadoEnvio == 2) {
+    html += F("<h2 style='color:#4ade80;margin-top:0'>Recibido y confirmado por Protección Civil</h2>");
+  } else if (estadoEnvio == 1) {
+    html += F("<h2 style='color:#fbbf24;margin-top:0'>Enviado por radio (sin confirmación del receptor)</h2>"
+              "<p style='font-size:.85rem;color:#fde68a'>Verifica que el ESP32 #2 esté encendido y cerca.</p>");
+  } else {
+    html += F("<h2 style='color:#f87171;margin-top:0'>No se pudo transmitir por ESP-NOW</h2>");
+  }
   html += F("<p>Trama compacta enviada (");
   html += String(trama.length());
   html += F(" bytes):</p><code>");
@@ -251,7 +323,10 @@ void redirigirPortal() {
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  pinMode(LED_EXT_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  fijarLed(false);
+  digitalWrite(BUZZER_PIN, LOW);
 
   // 1. Iniciar Wi-Fi en modo AP+STA sin ahorro de energía y bloquear el canal exacto
   WiFi.persistent(false);
@@ -287,6 +362,7 @@ void setup() {
       peer.ifidx   = WIFI_IF_STA;
       r = esp_now_add_peer(&peer);
     }
+    esp_now_register_recv_cb(alRecibirAck);
     Serial.println(r == ESP_OK ? "ESP-NOW listo en canal " + String(chReal)
                                : "ERROR agregando peer ESP-NOW: " + String((int)r));
   }
@@ -304,11 +380,20 @@ void setup() {
   server.onNotFound(redirigirPortal);
   server.begin();
 
-  parpadear(3);
+  // Prueba rápida de arranque: parpadea LED y suena un pitido corto
+  fijarLed(true);
+  sonar(1400, 80);
+  fijarLed(false);
+  parpadear(2);
   Serial.println("Listo. Conecta tu celular al Wi-Fi 'NEXO-Albergue'.");
 }
 
 void loop() {
   dnsServer.processNextRequest();
   server.handleClient();
+  if (ledApagarEn > 0 && millis() >= ledApagarEn) {
+    ledApagarEn = 0;
+    fijarLed(false);
+  }
 }
+
