@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEXO · Puebla</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -41,26 +42,44 @@
   <main class="panel" id="panel">
 
     <!-- INICIO -->
-    <section class="sec" data-sec="inicio">
-      <h1>¿Qué quieres hacer?</h1>
-      <p class="intro">NEXO cruza el censo del INEGI con datos de volcán, sismos y clima para saber <strong>cuánta gente hay en riesgo</strong>, <strong>dónde conviene poner albergues</strong> y <strong>cuántas personas faltan por confirmar</strong> en una emergencia.</p>
-      <div class="tarjetas">
-        <button class="tarjeta" data-ir="riesgo"><b>Ver el riesgo en Puebla</b><span>Mapa con semáforo por localidad según el fenómeno y el mes.</span></button>
-        <button class="tarjeta" data-ir="contar"><b>Contar personas en una zona</b><span>Dibuja un círculo o polígono y obtén población y grupos vulnerables.</span></button>
-        <button class="tarjeta" data-ir="municipios"><b>Revisar un municipio</b><span>Tablero con ranking estatal y ficha de cada municipio.</span></button>
-        <button class="tarjeta" data-ir="albergues"><b>Proponer albergues</b><span>Ubicaciones estratégicas fuera de peligro que cubren a más gente.</span></button>
-        <button class="tarjeta" data-ir="operacion"><b>Registrar albergues y bases</b><span>Personas a salvo, capacidad y necesidades. Expuestos vs. confirmados.</span></button>
-        <button class="tarjeta" data-ir="rutas"><b>Trazar una ruta de atención</b><span>De la base más cercana a la emergencia, o de la emergencia al albergue.</span></button>
+    <section class="sec inicio" data-sec="inicio">
+      <div class="lectura" aria-live="polite">
+        <h1><span id="iCifra" class="lectura-cifra">–</span> <span class="lectura-txt">personas viven en localidades con riesgo alto o muy alto</span></h1>
+        <div id="iFranja" class="franja"></div>
+        <p id="iDetalle" class="lectura-detalle">Calculando con el escenario elegido en la barra superior…</p>
+        <button type="button" class="primario" data-ir="riesgo">Abrir el mapa de riesgo</button>
       </div>
+
+      <p class="intro">NEXO cruza el censo del INEGI con datos del volcán, sismos y clima para saber cuánta gente está en riesgo, dónde conviene abrir albergues y cuántas personas faltan por confirmar.</p>
+
+      <h2>Antes de la emergencia</h2>
+      <ul class="acciones">
+        <li><button type="button" class="accion" data-ir="riesgo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg><span><b>Ver el riesgo en Puebla</b><span>Semáforo por localidad según el fenómeno y el mes.</span></span></button></li>
+        <li><button type="button" class="accion" data-ir="contar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg><span><b>Contar personas en una zona</b><span>Dibuja un círculo o polígono y obtén población y grupos vulnerables.</span></span></button></li>
+        <li><button type="button" class="accion" data-ir="municipios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span><b>Revisar un municipio</b><span>Ranking estatal y ficha de cada municipio.</span></span></button></li>
+        <li><button type="button" class="accion" data-ir="albergues"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V10l7-5 7 5v10M10 20v-5h4v5"/></svg><span><b>Proponer albergues</b><span>Sedes fuera de peligro que alcanzan a más gente en riesgo.</span></span></button></li>
+      </ul>
+
+      <h2>Durante la emergencia</h2>
+      <ul class="acciones">
+        <li><button type="button" class="accion" data-ir="operacion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8M20 12v7H4V5h11"/></svg><span><b>Registrar albergues y bases</b><span>Personas a salvo, capacidad y necesidades; expuestos contra confirmados.</span></span></button></li>
+        <li><button type="button" class="accion" data-ir="rutas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8 17c6-1 2-9 8-10"/></svg><span><b>Trazar una ruta de atención</b><span>De la base más cercana a la emergencia, o de ahí al albergue.</span></span></button></li>
+      </ul>
+
+      <a class="publica" href="cerca.html" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+        <span><b>Página para la población</b><span>Muestra el albergue más cercano y funciona sin internet. Compártela con la gente de la zona.</span></span>
+      </a>
+
       <h2>Estado de los datos</h2>
       <ul id="checklist" class="checklist"></ul>
+
       <h2>Primeros pasos</h2>
       <ol class="pasos">
-        <li>Arriba elige el <b>fenómeno</b> y el <b>mes</b>: todo NEXO se recalcula con ese escenario.</li>
-        <li>Usa la barra de herramientas (a la izquierda; arriba en el celular) para cambiar de sección.</li>
-        <li>Cada herramienta te dice qué hacer en el recuadro “Cómo se usa”.</li>
+        <li>Elige el <b>fenómeno</b> y el <b>mes</b> en la barra superior: todo NEXO se recalcula con ese escenario.</li>
+        <li>Cambia de herramienta con la barra lateral (arriba, en el celular).</li>
+        <li>Cada herramienta explica qué hacer en el recuadro “Cómo se usa”.</li>
       </ol>
-      <p class="nota">Página pública para la población: <a href="cerca.html" target="_blank" rel="noopener">albergue más cercano (funciona sin internet)</a>.</p>
     </section>
 
     <!-- MAPA DE RIESGO -->
