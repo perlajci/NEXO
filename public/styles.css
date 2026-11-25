@@ -163,6 +163,114 @@ tbody tr.clic{cursor:pointer}tbody tr.clic:hover{background:var(--panel2)}
 .cols i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px}.cols div.sel i{background:#e3742b}
 .ejes{display:flex;gap:2px;font-size:11px;color:var(--muted)}.ejes span{flex:1;text-align:center}
 code{font-size:13px;overflow-wrap:anywhere}
+/* ---------- Tabulador ---------- */
+/* Tipo de dato: verde = oficial CAPCEE, gris = referencia pública, ámbar = estimado. */
+.tipo-dato{display:inline-block;padding:2px 9px;border-radius:99px;border:1px solid transparent;font-size:11.5px;font-weight:700;line-height:1.5;white-space:nowrap;cursor:help}
+.tipo-dato.oficial{background:light-dark(#dcf2e5,#103a25);color:light-dark(#17613a,#8fe0b2);border-color:light-dark(#afdcc1,#1f5c3b)}
+.tipo-dato.referencia{background:light-dark(#eceff3,#1f2b3e);color:light-dark(#475467,#c2cad6);border-color:light-dark(#d3d9e2,#34425a)}
+.tipo-dato.estimado{background:light-dark(#fdefd2,#3a2b0a);color:light-dark(#835400,#f3c860);border-color:light-dark(#f0d398,#5c4512)}
+.tipo-dato:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.leyenda[hidden]{display:none}
+.globo{position:fixed;z-index:2000;max-width:min(340px,calc(100vw - 16px));padding:8px 11px;border-radius:8px;background:#0b2a55;color:#fff;font-size:12.5px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none}
+#tTabla td{vertical-align:top}#tTabla code{font-size:12px;white-space:nowrap}
+#tTabla td:nth-child(2){min-width:220px}
+.celda-vacia{text-align:center;color:var(--muted);padding:24px 8px}
+.paginador{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+.paginador span{font-size:13px;color:var(--muted)}.paginador button:disabled{opacity:.45;cursor:default}
+.aviso-sec{margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;background:var(--panel2);font-size:14px}
+.aviso-sec b{display:block;margin-bottom:2px}
+#tRechazados ul{margin:6px 0;padding-left:18px;font-size:13px}
+/* ---------- Presupuesto ---------- */
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.num-pres{display:inline-grid;place-items:center;min-width:22px;height:22px;margin-left:6px;padding:0 6px;border-radius:99px;background:var(--accentSoft);color:var(--accent);font-size:12px;font-weight:800}
+.segmento .activo .num-pres{background:rgba(255,255,255,.22);color:inherit}
+button.agregar{min-height:34px;padding:4px 12px;font-size:13px;white-space:nowrap;color:var(--accent);border-color:var(--accent)}
+button.agregar:hover{background:var(--accentSoft)}
+button.agregar.agregado{color:var(--ok);border-color:transparent;background:transparent;cursor:default}
+button.agregar.agregado::before{content:"✓ "}
+button.enlace{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;font-weight:600}
+button.enlace:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:3px}
+.opcional{font-weight:400;color:var(--muted)}
+.campo-msg{margin:-4px 0 6px;font-size:13px;color:var(--warn);min-height:0}
+.campo-msg:empty{display:none}
+input[aria-invalid=true]{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+#pTabla td{vertical-align:top}#pTabla code{font-size:12px}
+#pTabla td:first-child{min-width:200px}
+.tabla-pres{overflow-x:auto}
+.cant{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.cant .u{color:var(--muted);font-size:13px}.cant-fija{color:var(--muted);white-space:nowrap}
+#pTabla .factores{white-space:nowrap;font-variant-numeric:tabular-nums}
+#pTabla abbr{text-decoration:none;border-bottom:1px dotted currentColor;cursor:help}
+#pTabla .tipo-dato{margin-left:4px;font-size:10.5px;padding:0 7px}
+#pTabla input.cantidad{width:84px;min-height:36px;text-align:right;font-variant-numeric:tabular-nums}
+#pTabla .importe{font-weight:700;white-space:nowrap}
+.pct-base{display:block;margin:2px 0 0}
+button.quitar{min-height:34px;padding:4px 10px;font-size:13px}
+button.quitar:hover{border-color:var(--warn);color:var(--warn)}
+.aviso-estimado{margin:16px 0 8px;padding:10px 12px 10px 38px;border-radius:8px;position:relative;font-weight:700;font-size:14px;
+  background:light-dark(#fdefd2,#3a2b0a);color:light-dark(#6b4500,#f3c860);border:1px solid light-dark(#f0d398,#5c4512)}
+.aviso-estimado::before{content:"!";position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:light-dark(#b07400,#f3c860);color:light-dark(#fff,#3a2b0a)}
+.totales{margin:8px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel2)}
+.totales div{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid var(--line)}
+.totales dt{color:var(--muted);font-weight:600}.totales dd{margin:0;font-variant-numeric:tabular-nums;font-weight:700}
+.totales .total{border-bottom:0;background:var(--riel);color:#fff}
+.totales .total dt{color:#cfe0f4}.totales .total dd{font-size:20px;font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-weight:800}
+.desglose{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.des-cap+.des-cap{border-top:1px solid var(--line)}
+.des-fila{display:flex;justify-content:space-between;gap:12px;padding:7px 14px;font-size:13.5px}
+.des-fila b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.des-n1{background:var(--panel2);font-weight:800}
+.des-n2{padding-left:28px;font-weight:600}
+.des-n3{padding-left:44px;color:var(--muted)}.des-n3 b{font-weight:600;color:var(--ink)}
+.des-n3 small{display:block;font-size:11.5px}
+.des-n3 .pendiente{font-style:italic}
+/* ---------- Presupuestos guardados ---------- */
+a.boton{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;text-decoration:none}
+a.boton:hover{border-color:var(--accent)}
+a.boton.primario{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
+button.peligro-suave:hover{border-color:var(--warn);color:var(--warn)}
+button.peligro{background:var(--warn);border-color:var(--warn);color:#fff}
+.acciones-pres{margin-top:12px}.acciones-pres>*{flex:1 1 160px}
+.acciones-g{white-space:nowrap}.acciones-g>*{min-height:34px;padding:4px 10px;font-size:13px;margin:2px 0}
+#gTabla td{vertical-align:top}#gTabla code{white-space:nowrap}
+/* Lo oculto con el atributo hidden se oculta aunque la clase tenga display (paginadores, leyenda, avisos). */
+[hidden]{display:none !important}
+.msg-ok{margin:8px 0;padding:10px 12px;border-radius:8px;border:1px solid light-dark(#afdcc1,#1f5c3b);background:light-dark(#e6f5ec,#103a25);color:light-dark(#17613a,#8fe0b2);font-weight:600;font-size:14px}
+.etq-anterior{display:inline-block;margin-top:3px;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:700;background:light-dark(#e8ecf9,#1d2a4a);color:light-dark(#2d3f8f,#b7c6ff);border:1px dashed light-dark(#9fb0e6,#4b5f9e);cursor:help}
+.aviso-anterior{margin:8px 0 12px;padding:10px 12px;border-radius:8px;border:1px dashed light-dark(#9fb0e6,#4b5f9e);background:var(--panel2);font-size:13.5px}
+.aviso-anterior p{margin:6px 0 2px}.aviso-anterior ul{margin:2px 0;padding-left:18px}
+.ficha-titulo{font-size:19px;margin:6px 0 8px}.ficha-titulo:focus{outline:none}
+.ficha-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin:0 0 12px}
+.ficha-meta div{border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--panel2)}
+.ficha-meta dt{font-size:12px;color:var(--muted)}.ficha-meta dd{margin:0;font-weight:700}
+.tabla-ficha td{vertical-align:top}
+.aviso-disco{margin-top:16px;padding-top:10px;border-top:1px solid var(--line)}
+.dialogo{max-width:min(440px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.dialogo::backdrop{background:rgba(6,18,40,.55)}
+.dialogo form{padding:20px}
+.dialogo h2{margin:0 0 8px;font-size:18px}
+.dialogo p{margin:0 0 18px;color:var(--muted);font-size:14.5px}
+.dlg-botones{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.dlg-botones button{min-width:110px}
+/* ---------- Tarjeta del tabulador en Inicio y Ayuda ---------- */
+.tab-tipos{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tab-tipos .tipo-dato{cursor:inherit;text-transform:none}
+.ayuda-tab h3{font-size:14.5px;margin:14px 0 4px}.ayuda-tab ul{padding-left:18px}.ayuda-tab li{margin:6px 0}.ayuda-tab li .tipo-dato{margin-right:4px;cursor:default}
+.ayuda-tab .pendiente{font-style:italic;font-weight:600}
+.glosario{margin:6px 0 0}.glosario dt{font-weight:700;margin-top:8px}.glosario dd{margin:2px 0 0}
+
+/* ---------- Actualizar precios ---------- */
+.resumen-cambios{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:10px 0}
+.resumen-cambios li{padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--panel2);font-size:13.5px}
+.tabla-dif td{vertical-align:top}.tabla-dif td:first-child{min-width:200px}
+.tabla-dif tr.usado td{background:light-dark(#eef2fc,#17254a)}
+.tabla-dif tr.usado td:first-child{box-shadow:inset 4px 0 0 light-dark(#4b63c4,#8ea2ff)}
+.cambios{margin:0;padding-left:16px;font-size:13.5px}.cambios li{margin:2px 0}
+.dif{white-space:nowrap;font-weight:700;font-variant-numeric:tabular-nums}
+.dif.sube{color:var(--warn)}.dif.baja{color:var(--ok)}
+.etq-usado{display:inline-block;margin-top:3px;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:700;background:light-dark(#dfe6fb,#22346b);color:light-dark(#2d3f8f,#c9d4ff)}
+#aActual dd{font-weight:700}
+#formCarga input[type=file]{padding:8px;background:var(--panel2)}
+#formCarga :disabled{opacity:.55;cursor:not-allowed}
+#aMsg:focus{outline:3px solid var(--accent);outline-offset:2px}
+#aPreviaTitulo:focus{outline:none}
 @media (max-width:1150px){.app{grid-template-columns:76px 340px minmax(0,1fr)}body.ancho .app{grid-template-columns:76px minmax(0,62%) minmax(0,1fr)}}
 @media (max-width:900px){
   body{overflow:visible;display:block;height:auto}html{height:auto}
@@ -181,6 +289,9 @@ code{font-size:13px;overflow-wrap:anywhere}
   .panel{padding:18px 16px 40px}
   .stack thead{display:none}.stack tr{display:grid;padding-block:8px}.stack td{display:flow-root;border:0;padding:2px 0;padding-inline-start:7.5em;text-align:start}
   .stack td::before{content:attr(data-l);float:inline-start;width:7em;margin-inline-start:-7.5em;color:var(--muted)}
+  #tTabla td:nth-child(2){min-width:0}#tTabla .celda-vacia{padding-inline-start:0;text-align:center}
+  .tabla-dif td:first-child{min-width:0}.tabla-dif tr.usado{box-shadow:inset 4px 0 0 light-dark(#4b63c4,#8ea2ff);padding-inline-start:10px;background:light-dark(#eef2fc,#17254a)}.tabla-dif tr.usado td:first-child{box-shadow:none}
+  #pTabla td:first-child{min-width:0}#pTabla input.cantidad{width:110px}#pTabla td{padding-inline-start:6.5em}#pTabla td::before{width:6em;margin-inline-start:-6.5em}.des-n2{padding-left:20px}.des-n3{padding-left:28px}
   .tres span{font-size:20px}
 }
 @media (prefers-reduced-motion:reduce){.progreso i,.riel button,.accion,.publica{transition:none}}
