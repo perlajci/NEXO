@@ -11,7 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
 /*
-LOGIN PIANI: fondo azul marino de la marca con curvas de nivel (el volcán, el territorio) y una
+LOGIN PIANI: en pantallas anchas, foto de la Catedral de Puebla en azul marino (login-fondo.jpg); en
+angostas, fondo azul marino con curvas de nivel (el volcán, el territorio). Del otro lado, una
 tarjeta blanca donde el logo se usa tal cual, con su fondo blanco. Una sola acción: entrar.
 */
 :root{--marino:#0b2a55;--marino2:#082044;--turquesa:#19c3cf;--acento:#0a7d89;--tinta:#0b2a55;--suave:#5b6d85;
@@ -30,6 +31,15 @@ body{margin:0;min-height:100%;display:grid;grid-template-columns:minmax(0,1.1fr)
 .marca h2{margin:0 0 14px;font:800 clamp(28px,3.2vw,42px)/1.12 "Plus Jakarta Sans",system-ui,sans-serif;letter-spacing:-.01em;text-wrap:balance}
 .marca p{margin:0;font-size:17px;line-height:1.55;color:#c9daf0;max-width:26rem}
 .marca .pie{position:relative;margin-top:40px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:13px;color:#9fb6d6}
+/* Pantallas anchas: foto de la Catedral de Puebla. La imagen ya trae el lema escrito, así que el
+   título y el párrafo quedan solo para lectores de pantalla (no se repiten en pantalla). Se ancla abajo
+   a la izquierda para que el lema no se recorte. En pantallas angostas sigue el fondo de curvas. */
+@media (min-width:861px){
+  .marca{background:var(--marino2) url(login-fondo.jpg) left bottom/cover no-repeat;padding-bottom:28px}
+  .marca .curvas{display:none}
+  .marca h2,.marca .lema{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .marca .pie{margin-top:0;border-top-color:rgba(255,255,255,.2);color:#c9daf0}
+}
 
 /* ---------- Tarjeta de acceso ---------- */
 .acceso{display:grid;place-items:center;padding:40px 24px;background:#f3f6fa}
@@ -97,7 +107,7 @@ input[aria-invalid=true]{border-color:var(--error);box-shadow:0 0 0 4px rgba(184
     </svg>
     <div class="marca-texto">
       <h2>Saber quién está en riesgo antes de que llegue el primer reporte.</h2>
-      <p>Población expuesta, albergues, rutas y reportes sin internet para coordinar la atención de emergencias en Puebla.</p>
+      <p class="lema">Población expuesta, albergues, rutas y reportes sin internet para coordinar la atención de emergencias en Puebla.</p>
       <p class="pie">Power Girls ITESP, HackaTec 2026</p>
     </div>
   </section>

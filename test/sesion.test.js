@@ -87,10 +87,11 @@ test('login: sin sesión el tablero manda al login y la API responde 401', async
 });
 
 test('login: la página pública, el login y los reportes de ESP32 siguen abiertos', async () => {
-  for (const r of ['/login.html', '/cerca.html', '/sw.js', '/manifest.webmanifest', '/piani-logo.png', '/api/albergues/publicos']) {
+  for (const r of ['/login.html', '/cerca.html', '/sw.js', '/manifest.webmanifest', '/piani-logo.png', '/login-fondo.jpg', '/api/albergues/publicos']) {
     assert.equal((await pedir(r)).status, 200, r);
   }
   assert.equal((await pedir('/piani-logo.png')).headers.get('content-type'), 'image/png');
+  assert.equal((await pedir('/login-fondo.jpg')).headers.get('content-type'), 'image/jpeg');
   const trama = await pedir('/api/lora/trama', { metodo: 'POST', cuerpo: 'A|Albergue prueba|10|50|19.04|-98.2|ag', json: false });
   assert.equal(trama.status, 201, 'el puente USB y la puerta de enlace no tienen sesión');
 });
