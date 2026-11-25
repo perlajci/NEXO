@@ -1,0 +1,9 @@
+﻿CLAVE_CT,NOMBRE_CT,NIVEL,SOSTENIMIENTO,MUNICIPIO,LOCALIDAD,LATITUD,LONGITUD,ALUMNOS,FUENTE
+21ZZZ0001A,"Escuela de prueba Uno, turno matutino",PRIMARIA,FEDERAL TRANSFERIDO,Municipio A,Localidad Dos,19.166700,-98.333300,320,DATOS DE PRUEBA (inventados solo para probar el código)
+21ZZZ0002B,Escuela de prueba Dos,Preescolar,Particular,Municipio A,Localidad Dos,19.17,-98.33,,DATOS DE PRUEBA (inventados solo para probar el código)
+ 21zzz0003c ,Escuela de prueba Tres,Telesecundaria,Estatal,Municipio B,Localidad Tres,"18°30'05.5"" N","97°30'10.2"" W",45,DATOS DE PRUEBA (inventados solo para probar el código)
+15ZZZ0004D,Escuela de prueba con CCT de otro estado,Primaria,Federal,Municipio A,Localidad Dos,19.1,-98.3,10,DATOS DE PRUEBA (inventados solo para probar el código)
+21ZZZ0005E,Escuela de prueba fuera de Puebla,Primaria,Federal,Otro estado,Otra localidad,19.4326,-99.1332,10,DATOS DE PRUEBA (inventados solo para probar el código)
+21ZZZ0006F,Escuela de prueba sin coordenadas,Primaria,Federal,Municipio B,Localidad Tres,,,10,DATOS DE PRUEBA (inventados solo para probar el código)
+21ZZZ0001A,Escuela de prueba Uno (renglón repetido),PRIMARIA,FEDERAL TRANSFERIDO,Municipio A,Localidad Dos,19.166700,-98.333300,150,DATOS DE PRUEBA (inventados solo para probar el código)
+21ZZZ0007G,Escuela de prueba Siete,Bachillerato General,Autónomo,Municipio B,Localidad Reservada,19.058333,-98.608333,,DATOS DE PRUEBA (inventados solo para probar el código)

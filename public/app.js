@@ -170,8 +170,19 @@
       item(!!e.iter, e.iter ? `Censo 2020 cargado: ${fmt(e.iter.localidades)} localidades con coordenadas.` : 'Falta el CSV del censo (ITER 2020) en data/iter/.'),
       item(!!e.sismos, e.sismos ? `Catálogo sísmico: ${fmt(e.sismos.eventos)} sismos desde ${esc(e.sismos.desde.slice(0, 4))}.` : 'Catálogo sísmico pendiente (requiere internet).'),
       item(!!e.clima, e.clima ? 'Climatología mensual lista (lluvias y heladas).' : 'Climatología pendiente: botón “Descargar clima” arriba.'),
+      item(!!e.escuelas?.cargadas, textoEscuelas(e.escuelas)),
       item(true, e.rutas === 'google' ? 'Rutas con Google Maps (con tráfico).' : 'Rutas con OpenStreetMap/OSRM (agrega GOOGLE_MAPS_API_KEY para usar Google).'),
     ].join('');
+  }
+  // Escuelas de data/escuelas/: cuántas se usan y cuántas se descartaron (y por qué).
+  function textoEscuelas(x) {
+    if (!x?.cargadas) return esc(x?.aviso || 'Escuelas: sin datos.');
+    const r = x.resumen;
+    const fuera = [
+      r.fueraDePuebla && `${fmt(r.fueraDePuebla)} fuera de Puebla`, r.sinCoordenadas && `${fmt(r.sinCoordenadas)} sin coordenadas`,
+      r.cctInvalido && `${fmt(r.cctInvalido)} con CCT inválida`, r.repetidas && `${fmt(r.repetidas)} repetidas`,
+    ].filter(Boolean);
+    return `Escuelas: ${fmt(x.total)} con coordenadas en Puebla (${esc(Object.keys(r.porFuente).join(', '))})${fuera.length ? `; descartadas: ${fuera.join(', ')}` : ''}.${x.errores?.length ? ` <strong>${esc(x.errores.join(' '))}</strong>` : ''}`;
   }
   let vigilando = null;
   function vigilar() {

@@ -19,6 +19,7 @@ import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DAT
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
 import { crearAlmacenJSON } from './lib/almacen.js';
+import { cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA } from './lib/escuelas.js';
 import { crearSesiones, esPublico, claveIgual, leerCookie, cookieSesion, COOKIE } from './lib/sesion.js';
 import {
   validarCSV, compararTabuladores, reemplazarTabulador, listarHistorial, claveCorrecta, RE_RESPALDO, LIMITE_BYTES,
@@ -35,6 +36,7 @@ const ARCHIVO_PLANTELES = path.join(DATA, 'capcee', 'planteles.csv'); // opciona
 // de datos, cambia solo esta línea por un objeto con guardar/listar/obtener/borrar (ver lib/almacen.js).
 const presupuestos = crearAlmacenJSON(path.join(DATA, 'presupuestos.json'));
 const DIR_HISTORIAL_TAB = path.join(DATA, 'capcee', 'historial');
+const DIR_ESCUELAS = path.join(DATA, 'escuelas');
 const AVISO_RENDER_TAB = 'En el plan gratuito de Render el disco se borra al reiniciar: el tabulador cargado aquí y su historial se pierden y vuelve el CSV del repositorio. Para conservarlo, sube el CSV nuevo al repositorio (data/capcee/tabulador.csv) o usa una base de datos.';
 const AVISO_DISCO ='Los presupuestos se guardan en un archivo del servidor. En el plan gratuito de Render el disco se borra al reiniciar: exporta a CSV los que necesites conservar.';
 
@@ -147,6 +149,32 @@ const requiereTabulador = (res) => {
   enviar(res, 409, { error: t.error, ayuda: t.ayuda });
   return true;
 };
+
+// ---------- Escuelas (data/escuelas/*.csv) ----------
+// Se vuelven a leer solo si cambian los CSV de la carpeta, así un archivo nuevo se ve sin reiniciar.
+// Sin archivo no se truena: queda un aviso para la sección.
+const AVISO_SIN_ESCUELAS = 'No hay escuelas cargadas. Copia en data/escuelas/ el CSV del Catálogo de Centros de Trabajo de la SEP o del DENUE del INEGI para Puebla (ver README).';
+let escCache = { marca: null, datos: null };
+function escuelas() {
+  const marca = marcaCarpeta(DIR_ESCUELAS);
+  if (escCache.marca !== marca) {
+    let datos = null;
+    try { datos = cargarEscuelasDesdeCarpeta(DIR_ESCUELAS); } catch (e) { datos = { escuelas: [], resumen: null, descartes: [], errores: [e.message] }; }
+    escCache = { marca, datos };
+    if (datos?.escuelas.length) console.log(`Escuelas: ${datos.escuelas.length} con coordenadas en Puebla (${datos.resumen.archivos.map((a) => a.archivo).join(', ')})`);
+    for (const e of datos?.errores || []) console.error('Escuelas:', e);
+  }
+  return escCache.datos;
+}
+function estadoEscuelas() {
+  const d = escuelas();
+  if (!d) return { cargadas: false, total: 0, aviso: AVISO_SIN_ESCUELAS };
+  return {
+    cargadas: d.escuelas.length > 0, total: d.escuelas.length, resumen: d.resumen, errores: d.errores,
+    descartes: d.descartes, limites: LIMITES_PUEBLA,
+    aviso: d.escuelas.length ? null : `Ningún renglón de data/escuelas/ se pudo usar. ${d.errores.join(' ')}`.trim(),
+  };
+}
 
 // ---------- Cálculos ----------
 function riesgoDe(l, fenomeno, mes) {
@@ -306,6 +334,7 @@ async function api(req, res, url) {
       sismos: estado.sismos ? { eventos: estado.sismos.eventos.length, desde: estado.sismos.desde, cache: estado.sismos._cache || null } : null,
       clima: estado.clima ? { celdas: estado.clima.celdas.length, inicio: estado.clima.inicio, fin: estado.clima.fin } : null,
       trabajos: estado.trabajos, errores: estado.errores,
+      escuelas: estadoEscuelas(),
       rutas: process.env.GOOGLE_MAPS_API_KEY ? 'google' : 'osrm',
       fenomenos: FENOMENOS, niveles: NIVELES, volcanes: VOLCANES, componentesV: estado.componentesV, necesidades: NECESIDADES,
     });
@@ -709,6 +738,7 @@ export const servidor = http.createServer(async (req, res) => {
 
 export async function iniciar() {
   cargarITER();
+  escuelas();
   await cargarClima();
   cargarSismos(); // en segundo plano
   await new Promise((r) => servidor.listen(PUERTO, r));
