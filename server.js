@@ -17,6 +17,8 @@ import { calcularRuta } from './lib/rutas.js';
 import { parsearTrama } from './lib/trama.js';
 import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DATO, UNIDADES } from './lib/tabulador.js';
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
+import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
+import { crearAlmacenJSON } from './lib/almacen.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.NEXO_DATA || path.join(DIR, 'data');
@@ -25,6 +27,10 @@ const fuentes = crearFuentes(path.join(DATA, 'cache'));
 const ARCHIVO_CONF = path.join(DATA, 'confirmaciones.json');
 const ARCHIVO_TAB = path.join(DATA, 'capcee', 'tabulador.csv');
 const ARCHIVO_PLANTELES = path.join(DATA, 'capcee', 'planteles.csv'); // opcional; aún no existe
+// Presupuestos guardados: misma capa que Operación (archivo JSON en data/). Para usar una base
+// de datos, cambia solo esta línea por un objeto con guardar/listar/obtener/borrar (ver lib/almacen.js).
+const presupuestos = crearAlmacenJSON(path.join(DATA, 'presupuestos.json'));
+const AVISO_DISCO = 'Los presupuestos se guardan en un archivo del servidor. En el plan gratuito de Render el disco se borra al reiniciar: exporta a CSV los que necesites conservar.';
 
 const estado = {
   iter: null, componentesV: [], sismos: null, sismoInfo: null, clima: null, maximos: null,
@@ -481,6 +487,58 @@ async function api(req, res, url) {
       if (e instanceof ErrorPresupuesto) return enviar(res, 400, { error: e.message, errores: e.errores });
       throw e;
     }
+  }
+
+  // ---------- Presupuestos guardados ----------
+  if (ruta === '/api/presupuestos' && req.method === 'GET') {
+    const t = tabulador();
+    const catalogo = t.ok ? t.conceptos : null;
+    let lista = presupuestos.listar();
+    if (q.get('recursos') === '1') lista = lista.filter((p) => p.recursosCapcee);
+    lista.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    return enviar(res, 200, { almacen: presupuestos.tipo, aviso: AVISO_DISCO, huellaActual: t.ok ? t.huella : null, presupuestos: lista.map((p) => resumenGuardado(p, catalogo)) });
+  }
+  if (ruta === '/api/presupuestos' && req.method === 'POST') {
+    if (requiereTabulador(res)) return;
+    const t = tabulador();
+    const b = await leerCuerpo(req);
+    // Solo se usan obra, cct, factor y {clave_ref, cantidad}: precios, importes y totales que
+    // mande el navegador se ignoran y se vuelven a calcular aquí.
+    const entrada = {
+      obra: b.obra, cct: b.cct, factor: b.factor,
+      renglones: Array.isArray(b.renglones) ? b.renglones.map((r) => ({ clave_ref: r?.clave_ref, cantidad: r?.cantidad })) : [],
+    };
+    let calculo;
+    try { calculo = calcularPresupuesto(entrada, t.conceptos, cargarPlanteles(ARCHIVO_PLANTELES)); } catch (e) {
+      if (e instanceof ErrorPresupuesto) return enviar(res, 400, { error: e.message, errores: e.errores });
+      throw e;
+    }
+    return enviar(res, 201, presupuestos.guardar(armarGuardado(calculo, t)));
+  }
+  const mp = ruta.match(/^\/api\/presupuestos\/([\w-]{1,64})(\/csv|\/recursos)?$/);
+  if (mp) {
+    const [, id, extra] = mp;
+    const p = presupuestos.obtener(id);
+    if (!p) return enviar(res, 404, { error: 'Presupuesto no encontrado' });
+    if (!extra && req.method === 'GET') {
+      const t = tabulador();
+      return enviar(res, 200, { ...p, comparacion: t.ok ? compararConTabulador(p, t.conceptos) : null, huellaActual: t.ok ? t.huella : null });
+    }
+    if (!extra && req.method === 'DELETE') return enviar(res, 200, { ok: presupuestos.borrar(id) });
+    if (extra === '/csv' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${nombreArchivoCSV(p)}"`,
+        'Cache-Control': 'no-store',
+      });
+      return res.end(presupuestoACSV(p));
+    }
+    // Deja el presupuesto disponible para el futuro módulo Recursos CAPCEE (ver paraRecursosCapcee).
+    if (extra === '/recursos' && req.method === 'POST') {
+      const marcado = presupuestos.guardar({ ...p, recursosCapcee: p.recursosCapcee || new Date().toISOString() });
+      return enviar(res, 200, paraRecursosCapcee(marcado));
+    }
+    return enviar(res, 405, { error: 'Método no permitido' });
   }
 
   if (ruta === '/api/preparar/clima' && req.method === 'POST') {

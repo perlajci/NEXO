@@ -203,7 +203,7 @@ input[aria-invalid=true]{border-color:var(--warn);box-shadow:0 0 0 1px var(--war
 #pTabla .tipo-dato{margin-left:4px;font-size:10.5px;padding:0 7px}
 #pTabla input.cantidad{width:84px;min-height:36px;text-align:right;font-variant-numeric:tabular-nums}
 #pTabla .importe{font-weight:700;white-space:nowrap}
-#pTabla .pct-base{display:block;margin:2px 0 0}
+.pct-base{display:block;margin:2px 0 0}
 button.quitar{min-height:34px;padding:4px 10px;font-size:13px}
 button.quitar:hover{border-color:var(--warn);color:var(--warn)}
 .aviso-estimado{margin:16px 0 8px;padding:10px 12px 10px 38px;border-radius:8px;position:relative;font-weight:700;font-size:14px;
@@ -223,6 +223,33 @@ button.quitar:hover{border-color:var(--warn);color:var(--warn)}
 .des-n3{padding-left:44px;color:var(--muted)}.des-n3 b{font-weight:600;color:var(--ink)}
 .des-n3 small{display:block;font-size:11.5px}
 .des-n3 .pendiente{font-style:italic}
+/* ---------- Presupuestos guardados ---------- */
+a.boton{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-weight:600;font-size:14px;text-decoration:none}
+a.boton:hover{border-color:var(--accent)}
+a.boton.primario{background:var(--accent);border-color:var(--accent);color:var(--accentInk)}
+button.peligro-suave:hover{border-color:var(--warn);color:var(--warn)}
+button.peligro{background:var(--warn);border-color:var(--warn);color:#fff}
+.acciones-pres{margin-top:12px}.acciones-pres>*{flex:1 1 160px}
+.acciones-g{white-space:nowrap}.acciones-g>*{min-height:34px;padding:4px 10px;font-size:13px;margin:2px 0}
+#gTabla td{vertical-align:top}#gTabla code{white-space:nowrap}
+/* Lo oculto con el atributo hidden se oculta aunque la clase tenga display (paginadores, leyenda, avisos). */
+[hidden]{display:none !important}
+.msg-ok{margin:8px 0;padding:10px 12px;border-radius:8px;border:1px solid light-dark(#afdcc1,#1f5c3b);background:light-dark(#e6f5ec,#103a25);color:light-dark(#17613a,#8fe0b2);font-weight:600;font-size:14px}
+.etq-anterior{display:inline-block;margin-top:3px;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:700;background:light-dark(#e8ecf9,#1d2a4a);color:light-dark(#2d3f8f,#b7c6ff);border:1px dashed light-dark(#9fb0e6,#4b5f9e);cursor:help}
+.aviso-anterior{margin:8px 0 12px;padding:10px 12px;border-radius:8px;border:1px dashed light-dark(#9fb0e6,#4b5f9e);background:var(--panel2);font-size:13.5px}
+.aviso-anterior p{margin:6px 0 2px}.aviso-anterior ul{margin:2px 0;padding-left:18px}
+.ficha-titulo{font-size:19px;margin:6px 0 8px}.ficha-titulo:focus{outline:none}
+.ficha-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin:0 0 12px}
+.ficha-meta div{border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--panel2)}
+.ficha-meta dt{font-size:12px;color:var(--muted)}.ficha-meta dd{margin:0;font-weight:700}
+.tabla-ficha td{vertical-align:top}
+.aviso-disco{margin-top:16px;padding-top:10px;border-top:1px solid var(--line)}
+.dialogo{max-width:min(440px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.dialogo::backdrop{background:rgba(6,18,40,.55)}
+.dialogo form{padding:20px}
+.dialogo h2{margin:0 0 8px;font-size:18px}
+.dialogo p{margin:0 0 18px;color:var(--muted);font-size:14.5px}
+.dlg-botones{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.dlg-botones button{min-width:110px}
 @media (max-width:1150px){.app{grid-template-columns:76px 340px minmax(0,1fr)}body.ancho .app{grid-template-columns:76px minmax(0,62%) minmax(0,1fr)}}
 @media (max-width:900px){
   body{overflow:visible;display:block;height:auto}html{height:auto}

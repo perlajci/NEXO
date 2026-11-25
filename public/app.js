@@ -90,7 +90,7 @@
     if (sec === 'reportes') { cargarConfirmaciones().then(() => { pintarReportes(); centrarReportes(); }); }
     if (sec === 'operacion' || sec === 'rutas') cargarConfirmaciones();
     if (sec === 'sismos' || sec === 'clima') textoCentro();
-    if (sec === 'tabulador') cargarTabulador();
+    if (sec === 'tabulador') { cargarTabulador(); cargarGuardados(); }
   }
   $$('.riel button').forEach((b) => b.addEventListener('click', () => irA(b.dataset.sec)));
   document.addEventListener('click', (ev) => {
@@ -985,17 +985,42 @@
     return `<button type="button" class="agregar${ya ? ' agregado' : ''}" data-agregar="${esc(c.clave_ref)}" aria-pressed="${ya}" aria-label="${esc(`${ya ? 'Ya está en el presupuesto' : 'Agregar al presupuesto'}: ${c.clave_ref}`)}">${ya ? 'Agregado' : 'Agregar'}</button>`;
   }
 
+  const VISTAS_TAB = { cat: ['#tVistaCat', '#tVerCat'], pres: ['#tVistaPres', '#tVerPres'], guard: ['#tVistaGuard', '#tVerGuard'] };
   function verVistaTab(cual) {
-    const pre = cual === 'pres';
-    $('#tVistaCat').hidden = pre;
-    $('#tVistaPres').hidden = !pre;
-    $('#tVerCat').classList.toggle('activo', !pre); $('#tVerCat').setAttribute('aria-pressed', String(!pre));
-    $('#tVerPres').classList.toggle('activo', pre); $('#tVerPres').setAttribute('aria-pressed', String(pre));
-    if (pre) recalcular(0);
+    for (const [k, [vista, boton]] of Object.entries(VISTAS_TAB)) {
+      const activa = k === cual;
+      $(vista).hidden = !activa;
+      $(boton).classList.toggle('activo', activa);
+      $(boton).setAttribute('aria-pressed', String(activa));
+    }
+    if (cual === 'pres') recalcular(0);
+    if (cual === 'guard') { mostrarListaGuard(); cargarGuardados(); }
   }
   $('#tVerCat').addEventListener('click', () => verVistaTab('cat'));
   $('#tVerPres').addEventListener('click', () => verVistaTab('pres'));
+  $('#tVerGuard').addEventListener('click', () => verVistaTab('guard'));
   $('#pIrCat').addEventListener('click', () => { verVistaTab('cat'); $('#tBuscar').focus(); });
+
+  // Diálogo de confirmación propio de la página (no usa confirm() del navegador).
+  // Abre con el foco en "Cancelar"; Escape también cancela. Devuelve true si se acepta.
+  function confirmar({ titulo, texto, aceptar = 'Borrar' }) {
+    const d = $('#dlgConfirmar');
+    $('#dlgTitulo').textContent = titulo;
+    $('#dlgTexto').textContent = texto;
+    $('#dlgSi').textContent = aceptar;
+    const regreso = document.activeElement;
+    return new Promise((resolver) => {
+      d.returnValue = 'no';
+      d.addEventListener('close', () => {
+        resolver(d.returnValue === 'si');
+        if (regreso?.isConnected) regreso.focus();
+      }, { once: true });
+      d.showModal();
+      $('#dlgNo').focus();
+    });
+  }
+  // Clic en el fondo oscuro = cancelar.
+  $('#dlgConfirmar').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close('no'); });
 
   $('#tTabla').addEventListener('click', (e) => {
     const b = e.target.closest('[data-agregar]');
@@ -1051,12 +1076,49 @@
     // El foco pasa al botón Quitar del renglón vecino, o al nombre de la obra si ya no quedan.
     (($(`#pTabla [data-quitar="${CSS.escape(vecino || '')}"]`)) || $('#pObra')).focus();
   });
-  $('#pVaciar').addEventListener('click', () => {
-    if (!pres.renglones.length || !confirm('¿Quitar todos los conceptos del presupuesto?')) return;
+  $('#pVaciar').addEventListener('click', async () => {
+    if (!pres.renglones.length) return;
+    const ok = await confirmar({ titulo: '¿Vaciar el presupuesto?', texto: `Se quitarán los ${pres.renglones.length} conceptos del presupuesto en curso. El nombre de la obra, el CCT y el factor se conservan.`, aceptar: 'Vaciar' });
+    if (!ok) return;
     pres.renglones = [];
     $('#pAnuncio').textContent = 'Presupuesto vacío.';
     cambioPres();
     $('#pObra').focus();
+  });
+
+  // Guardar: el navegador manda solo obra, CCT, factor y {clave, cantidad}; el servidor recalcula.
+  $('#pGuardar').addEventListener('click', async () => {
+    if (!revisarCampos()) { $('#pObra').focus(); return; }
+    const b = $('#pGuardar');
+    b.disabled = true;
+    b.textContent = 'Guardando…';
+    try {
+      const r = await fetch('/api/presupuestos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ obra: $('#pObra').value, cct: $('#pCct').value, factor: $('#pFactor').value, renglones: pres.renglones.map((x) => ({ clave_ref: x.clave_ref, cantidad: x.cantidad })) }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const lista = j.errores?.length ? j.errores : [j.error || 'No se pudo guardar.'];
+        $('#pErrores').hidden = false;
+        $('#pErrores').innerHTML = `<b>No se guardó:</b><ul>${lista.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+        return;
+      }
+      // Guardado: se limpia el presupuesto en curso de este navegador.
+      pres.renglones = [];
+      $('#pObra').value = ''; $('#pCct').value = ''; $('#pFactor').value = '1.00';
+      cambioPres();
+      try { localStorage.removeItem(BORRADOR); } catch { /* sin almacenamiento */ }
+      verVistaTab('guard');
+      mensajeGuard(`Se guardó “${j.obra}” con un total de ${dinero(j.total)}.`);
+      $('#tVerGuard').focus();
+    } catch {
+      $('#pErrores').hidden = false;
+      $('#pErrores').textContent = 'No hay conexión con el servidor; el presupuesto sigue aquí sin guardar.';
+    } finally {
+      b.disabled = false;
+      b.textContent = 'Guardar presupuesto';
+    }
   });
 
   // Validación inmediata de los campos (el servidor vuelve a validar todo).
@@ -1134,7 +1196,10 @@
     $('#pSub').textContent = dinero(p.subtotal);
     $('#pIva').textContent = dinero(p.iva);
     $('#pTot').textContent = dinero(p.total);
-    $('#pDesglose').innerHTML = p.desglose.map((c) => `
+    $('#pDesglose').innerHTML = htmlDesglose(p.desglose);
+    $('#pResultado').hidden = false;
+  }
+  const htmlDesglose = (desglose) => desglose.map((c) => `
       <div class="des-cap">
         <div class="des-fila des-n1"><span>Capítulo ${esc(c.capitulo)}</span><b>${dinero(c.importe)}</b></div>
         ${c.genericas.map((g) => `
@@ -1142,10 +1207,133 @@
           ${g.especificas.map((s) => `
             <div class="des-fila des-n3"><span class="${s.partida === 'Pendiente COGAPE' ? 'pendiente' : ''}">${esc(s.partida)} <small>${s.claves.map(esc).join(', ')}</small></span><b>${dinero(s.importe)}</b></div>`).join('')}`).join('')}
       </div>`).join('');
-    $('#pResultado').hidden = false;
+
+  // ---------- Presupuestos guardados ----------
+  const guard = { lista: [], pagina: 0 };
+  const fechaMX = (iso) => new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' });
+  const ETQ_ANTERIOR = '<span class="etq-anterior" title="Los precios de este presupuesto son distintos a los del tabulador actual. Se conservan los de la fecha en que se guardó.">calculado con tabulador anterior</span>';
+  function mensajeGuard(txt) { $('#gMsg').textContent = txt; $('#gMsg').hidden = !txt; }
+  function mostrarListaGuard() { $('#gLista').hidden = false; $('#gFicha').hidden = true; }
+
+  async function cargarGuardados() {
+    try {
+      const j = await apiTab('/api/presupuestos');
+      guard.lista = j.presupuestos;
+      $('#gAvisoDisco').textContent = j.aviso;
+      $('#tNumGuard').textContent = j.presupuestos.length;
+      pintarGuardados();
+    } catch (e) {
+      $('#gConteo').textContent = `No se pudieron cargar los presupuestos guardados: ${e.message}`;
+    }
+  }
+  function pintarGuardados() {
+    const total = guard.lista.length;
+    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    guard.pagina = Math.min(Math.max(0, guard.pagina), paginas - 1);
+    const ini = guard.pagina * POR_PAGINA;
+    const filas = guard.lista.slice(ini, ini + POR_PAGINA);
+    $('#gVacio').hidden = total > 0;
+    $('#gTablaCaja').hidden = total === 0;
+    $('#gPaginador').hidden = total <= POR_PAGINA;
+    $('#gConteo').textContent = total ? `Presupuestos ${fmt(ini + 1)}–${fmt(ini + filas.length)} de ${fmt(total)}, del más reciente al más antiguo.` : '';
+    $('#gPag').textContent = `Página ${guard.pagina + 1} de ${paginas}`;
+    $('#gAnt').disabled = guard.pagina === 0;
+    $('#gSig').disabled = guard.pagina >= paginas - 1;
+    $('#gTabla tbody').innerHTML = filas.map((p) => `<tr data-id="${esc(p.id)}">
+        <td data-l="Obra"><b>${esc(p.obra)}</b>${p.tabuladorAnterior ? `<br>${ETQ_ANTERIOR}` : ''}${p.hayEstimados ? ' <span class="tipo-dato estimado">con estimados</span>' : ''}</td>
+        <td data-l="CCT">${p.cct ? `<code>${esc(p.cct)}</code>` : '–'}</td>
+        <td data-l="Fecha">${esc(fechaMX(p.fecha))}</td>
+        <td data-l="Total" class="n"><b>${dinero(p.total)}</b></td>
+        <td data-l="" class="acciones-g">
+          <button type="button" data-ver="${esc(p.id)}" aria-label="${esc(`Ver ${p.obra}`)}">Ver</button>
+          <a class="boton" href="/api/presupuestos/${encodeURIComponent(p.id)}/csv" download aria-label="${esc(`Exportar a CSV ${p.obra}`)}">Exportar</a>
+          <button type="button" class="peligro-suave" data-borrar="${esc(p.id)}" aria-label="${esc(`Borrar ${p.obra}`)}">Borrar</button>
+        </td>
+      </tr>`).join('');
+  }
+  $('#gAnt').addEventListener('click', () => { guard.pagina--; pintarGuardados(); });
+  $('#gSig').addEventListener('click', () => { guard.pagina++; pintarGuardados(); });
+  $('#gIrPres').addEventListener('click', () => { verVistaTab('pres'); $('#pObra').focus(); });
+  $('#gVolver').addEventListener('click', () => { mostrarListaGuard(); cargarGuardados().then(() => $(`#gTabla [data-ver="${CSS.escape(guard.abierto || '')}"]`)?.focus()); });
+
+  $('#tVistaGuard').addEventListener('click', async (e) => {
+    const ver = e.target.closest('[data-ver]');
+    const borrar = e.target.closest('[data-borrar]');
+    const recursos = e.target.closest('[data-recursos]');
+    if (ver) abrirGuardado(ver.dataset.ver);
+    if (borrar) borrarGuardado(borrar.dataset.borrar);
+    if (recursos) usarEnRecursos(recursos.dataset.recursos);
+  });
+
+  async function abrirGuardado(id) {
+    let p;
+    try { p = await apiTab(`/api/presupuestos/${encodeURIComponent(id)}`); } catch (e) { mensajeGuard(`No se pudo abrir: ${e.message}`); return; }
+    guard.abierto = id;
+    mensajeGuard('');
+    const cambios = p.comparacion?.cambios || [];
+    $('#gFichaCont').innerHTML = `
+      <h2 class="ficha-titulo" tabindex="-1">${esc(p.obra)}</h2>
+      ${cambios.length ? `<div class="aviso-anterior">${ETQ_ANTERIOR}<p>Este presupuesto conserva los precios del día en que se guardó. Desde entonces cambió el tabulador:</p><ul>${cambios.map((c) => `<li><code>${esc(c.clave_ref)}</code>: ${esc(c.motivo)}</li>`).join('')}</ul></div>` : ''}
+      <dl class="ficha-meta">
+        <div><dt>CCT</dt><dd>${p.cct ? esc(p.cct) : 'Sin CCT'}</dd></div>
+        <div><dt>Guardado</dt><dd>${esc(fechaMX(p.fecha))}</dd></div>
+        <div><dt>Factor del presupuesto</dt><dd>${dos(p.factor_presupuesto)}</dd></div>
+        <div><dt>Huella del tabulador</dt><dd><code title="${esc(p.tabulador.huella)}">${esc(p.tabulador.huella.slice(0, 12))}…</code></dd></div>
+      </dl>
+      <div class="tabla-pres"><table class="stack tabla-ficha"><thead><tr><th>Concepto</th><th class="n">Cantidad</th><th class="n">Precio sin IVA</th><th class="n">Factores</th><th class="n">Importe</th></tr></thead><tbody>
+        ${p.renglones.map((r) => `<tr>
+          <td data-l="Concepto"><code>${esc(r.clave_ref)}</code> ${etiquetaTipo(r)}<br>${esc(r.concepto)}${r.porcentaje_de_base !== null ? `<span class="nota pct-base">${dos(r.precio)} % de ${dinero(r.porcentaje_de_base)}</span>` : ''}</td>
+          <td data-l="Cantidad" class="n">${r.unidad === '%' ? '1 vez' : `${fmt(r.cantidad, 3)} ${esc(r.unidad)}`}</td>
+          <td data-l="Precio sin IVA" class="n">${precioTab(r)}</td>
+          <td data-l="Factores" class="n">${r.factor_presupuesto === null ? 'No aplica' : `${dos(r.factor_concepto)} × ${dos(r.factor_presupuesto)}`}</td>
+          <td data-l="Importe" class="n"><b>${dinero(r.importe)}</b></td>
+        </tr>`).join('')}
+      </tbody></table></div>
+      ${p.aviso ? `<p class="aviso-estimado" role="note">${esc(p.aviso)}</p>` : ''}
+      <dl class="totales">
+        <div><dt>Subtotal</dt><dd>${dinero(p.subtotal)}</dd></div>
+        <div><dt>IVA 16 %</dt><dd>${dinero(p.iva)}</dd></div>
+        <div class="total"><dt>Total</dt><dd>${dinero(p.total)}</dd></div>
+      </dl>
+      <h3>Desglose por partida</h3>
+      <div class="desglose">${htmlDesglose(p.desglose)}</div>
+      <div class="fila acciones-pres">
+        <a class="boton primario" href="/api/presupuestos/${encodeURIComponent(p.id)}/csv" download>Exportar CSV</a>
+        <button type="button" data-recursos="${esc(p.id)}" ${p.recursosCapcee ? 'disabled' : ''}>${p.recursosCapcee ? 'Disponible en Recursos CAPCEE' : 'Usar en Recursos CAPCEE'}</button>
+        <button type="button" class="peligro-suave" data-borrar="${esc(p.id)}">Borrar</button>
+      </div>
+      <p class="nota" id="gRecursosNota">${p.recursosCapcee ? `Marcado para Recursos CAPCEE: ${esc(fechaMX(p.recursosCapcee))}` : 'Recursos CAPCEE (asignación por fuente y priorización) todavía no existe: este botón deja el presupuesto listo para cuando se construya.'}</p>`;
+    $('#gLista').hidden = true;
+    $('#gFicha').hidden = false;
+    $('#gFichaCont .ficha-titulo').focus();
   }
 
-  // Borrador en este navegador (comodidad; guardar de verdad llega en el paso 4).
+  async function borrarGuardado(id) {
+    const p = guard.lista.find((x) => x.id === id);
+    const nombre = p ? `“${p.obra}” (${dinero(p.total)})` : 'este presupuesto';
+    const ok = await confirmar({ titulo: '¿Borrar el presupuesto guardado?', texto: `Se borrará ${nombre}. No se puede deshacer; si lo necesitas, expórtalo a CSV antes.`, aceptar: 'Borrar' });
+    if (!ok) return;
+    const r = await fetch(`/api/presupuestos/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null);
+    if (!r || !r.ok) { mensajeGuard('No se pudo borrar el presupuesto. Intenta de nuevo.'); return; }
+    const i = guard.lista.findIndex((x) => x.id === id);
+    mostrarListaGuard();
+    await cargarGuardados();
+    mensajeGuard(`Se borró ${nombre}.`);
+    // El foco pasa al "Ver" del presupuesto que quedó en su lugar, o al botón Guardados.
+    const sig = guard.lista[Math.min(i, guard.lista.length - 1)];
+    (sig && $(`#gTabla [data-ver="${CSS.escape(sig.id)}"]`) || $('#tVerGuard')).focus();
+  }
+
+  async function usarEnRecursos(id) {
+    const r = await fetch(`/api/presupuestos/${encodeURIComponent(id)}/recursos`, { method: 'POST' }).catch(() => null);
+    if (!r || !r.ok) { mensajeGuard('No se pudo marcar para Recursos CAPCEE.'); return; }
+    const j = await r.json();
+    const b = $(`#gFichaCont [data-recursos="${CSS.escape(id)}"]`);
+    if (b) { b.disabled = true; b.textContent = 'Disponible en Recursos CAPCEE'; }
+    $('#gRecursosNota').textContent = `Marcado para Recursos CAPCEE: ${fechaMX(j.marcadoEn)}`;
+  }
+
+  // Borrador en este navegador (el guardado real está en el servidor, ver Guardados).
   function guardarBorrador() {
     try {
       localStorage.setItem(BORRADOR, JSON.stringify({

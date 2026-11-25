@@ -59,6 +59,8 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 *Web Service*, start command `npm start`, sin build. Sube el CSV del censo y `data/cache/` ya llena. En el plan gratuito el disco se borra al reiniciar: los registros de `data/confirmaciones.json` se pierden (para algo más que una demo, usar una base de datos).
 
+> **Aviso: presupuestos guardados del Tabulador.** Se guardan en `data/presupuestos.json`, con la misma capa que Operación. **En el plan gratuito de Render el disco se borra al reiniciar y se pierden todos los presupuestos guardados.** Exporta a CSV los que necesites conservar. El guardado está detrás de una interfaz (`guardar`, `listar`, `obtener`, `borrar` en `lib/almacen.js`): para pasar a una base de datos basta con escribir otro objeto con esos cuatro métodos y cambiar una línea en `server.js`.
+
 ## API
 
 | Método | Ruta | Descripción |

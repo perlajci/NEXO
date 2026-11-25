@@ -265,6 +265,7 @@
         <div class="segmento" role="group" aria-label="Vista del tabulador">
           <button type="button" id="tVerCat" class="activo" aria-pressed="true">Catálogo</button>
           <button type="button" id="tVerPres" aria-pressed="false">Armar presupuesto <span id="tNumPres" class="num-pres">0</span></button>
+          <button type="button" id="tVerGuard" aria-pressed="false">Guardados <span id="tNumGuard" class="num-pres">0</span></button>
         </div>
         <p id="pAnuncio" class="sr" aria-live="polite"></p>
         <div id="tVistaCat">
@@ -330,8 +331,32 @@
             </dl>
             <h2>Desglose por partida</h2>
             <div id="pDesglose" class="desglose"></div>
-            <button type="button" id="pVaciar" class="ancho100">Vaciar presupuesto</button>
+            <div class="fila acciones-pres">
+              <button type="button" id="pGuardar" class="primario">Guardar presupuesto</button>
+              <button type="button" id="pVaciar">Vaciar presupuesto</button>
+            </div>
+            <p class="nota">Al guardar se copian los precios y factores de hoy: si después cambia el tabulador, este presupuesto no cambia.</p>
           </div>
+        </div>
+
+        <!-- PRESUPUESTOS GUARDADOS -->
+        <div id="tVistaGuard" hidden>
+          <p id="gMsg" class="msg-ok" role="status" hidden></p>
+          <div id="gLista">
+            <p id="gConteo" class="nota"></p>
+            <div id="gVacio" class="vacio" hidden>Todavía no hay presupuestos guardados. Ármalo en <button type="button" class="enlace" id="gIrPres">Armar presupuesto</button> y presiona Guardar.</div>
+            <div class="tabla-pres" id="gTablaCaja"><table id="gTabla" class="stack"><thead><tr><th>Obra</th><th>CCT</th><th>Fecha</th><th class="n">Total con IVA</th><th><span class="sr">Acciones</span></th></tr></thead><tbody></tbody></table></div>
+            <div class="paginador" id="gPaginador">
+              <button type="button" id="gAnt">Anterior</button>
+              <span id="gPag"></span>
+              <button type="button" id="gSig">Siguiente</button>
+            </div>
+          </div>
+          <div id="gFicha" hidden>
+            <button type="button" id="gVolver" class="volver">← Todos los presupuestos</button>
+            <div id="gFichaCont"></div>
+          </div>
+          <p id="gAvisoDisco" class="nota aviso-disco"></p>
         </div>
       </div>
     </section>
@@ -421,6 +446,18 @@
     </div>
   </section>
 </div>
+
+<!-- Diálogo de confirmación propio (en lugar de confirm() del navegador) -->
+<dialog id="dlgConfirmar" class="dialogo" aria-labelledby="dlgTitulo" aria-describedby="dlgTexto">
+  <form method="dialog">
+    <h2 id="dlgTitulo"></h2>
+    <p id="dlgTexto"></p>
+    <div class="dlg-botones">
+      <button type="submit" value="no" id="dlgNo" autofocus>Cancelar</button>
+      <button type="submit" value="si" id="dlgSi" class="peligro">Borrar</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="vendor/leaflet.js"></script>
 <script src="app.js"></script>
