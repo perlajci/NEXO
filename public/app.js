@@ -9,6 +9,7 @@
   const pct = (a, b) => (b > 0 && Number.isFinite(a) ? (100 * a) / b : 0);
   const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const COLOR = { bajo: '#3f9b6b', medio: '#e0ad2f', alto: '#e3742b', muy_alto: '#c3262f', sin_dato: '#9aa0a6' };
+  const COBALTO = '#0b2a55'; // azul marino PIANI: zonas dibujadas por la persona usuaria
   const NIV_ORDEN = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_dato'];
   const NOM_NIV = { muy_alto: 'Muy alto', alto: 'Alto', medio: 'Medio', bajo: 'Bajo', sin_dato: 'Sin dato' };
   const NOM_NEC = { agua: 'Agua', alimentos: 'Alimentos', medicinas: 'Medicinas', atencion_medica: 'Atención médica', cobijas: 'Cobijas', traslado: 'Traslado', energia: 'Energía', comunicacion: 'Comunicación' };
@@ -121,6 +122,11 @@
     const b = $('#btnPrepClima');
     if (b) b.onclick = async () => { await postJSON('/api/preparar/clima', {}).catch(() => null); vigilar(); };
     $('#sinDatos').hidden = !!e.iter;
+    if (!e.iter) {
+      $('#iCifra').textContent = '–';
+      $('#iFranja').innerHTML = '';
+      $('#iEscenario').textContent = 'Falta cargar el censo del INEGI';
+    }
     const item = (ok, txt) => `<li><span class="${ok ? 'si' : 'no'}">${ok ? '✓' : '✗'}</span><span>${txt}</span></li>`;
     $('#checklist').innerHTML = [
       item(!!e.iter, e.iter ? `Censo 2020 cargado: ${fmt(e.iter.localidades)} localidades con coordenadas.` : 'Falta el CSV del censo (ITER 2020) en data/iter/.'),
@@ -194,6 +200,22 @@
       <div><b>${fmt(munMuyAlto)}</b><small>municipios con riesgo promedio muy alto</small></div>
       <div><b>${fmt(e.P_60YMAS)}</b><small>personas de 60 años y más en el estado</small></div>`;
     $('#rNivelesEst').innerHTML = barraNiveles(e.porNivel);
+    pintarLectura(e, altos, r.municipios.filter((m) => m.nivel === 'alto' || m.nivel === 'muy_alto').length);
+  }
+
+  // Lectura del escenario en Inicio: cuánta gente está en riesgo con el fenómeno y mes elegidos.
+  function pintarLectura(e, altos, munAltos) {
+    const fen = st.meta?.fenomenos?.[$('#fFenomeno').value];
+    const mes = MESES[Number($('#fMes').value) - 1];
+    $('#iEscenario').textContent = `${fen?.nombre || 'Sin escenario'}${fen?.estacional && mes ? `, ${mes.toLowerCase()}` : ''}`;
+    $('#iCifra').textContent = fmt(altos);
+    const tot = NIV_ORDEN.reduce((a, k) => a + (e.porNivel[k] || 0), 0) || 1;
+    const niv = NIV_ORDEN.filter((k) => (e.porNivel[k] || 0) > 0);
+    $('#iFranja').innerHTML = `<div class="apilada" role="img" aria-label="Población por nivel de riesgo">${niv.map((k) => `<i style="width:${pct(e.porNivel[k], tot)}%;background:${COLOR[k]}"></i>`).join('')}</div>
+      <div class="claves">${niv.map((k) => `<span><i style="background:${COLOR[k]}"></i>${NOM_NIV[k]} ${pct(e.porNivel[k], tot).toFixed(1)} %</span>`).join('')}</div>`;
+    $('#iPct').textContent = `${pct(altos, e.poblacion).toFixed(1)} %`;
+    $('#iPob').textContent = Number(e.poblacion).toLocaleString('es-MX', { notation: 'compact', maximumFractionDigits: 2 });
+    $('#iMun').textContent = fmt(munAltos);
   }
 
   // ---------- Contar población (geocerca) ----------
@@ -206,7 +228,7 @@
   function dibujarGeocerca(g, ajustar = true) {
     capas.geo.clearLayers(); capas.vert.clearLayers();
     if (!g) return;
-    const estilo = { color: '#0e5a7a', weight: 2.5, fillOpacity: 0.08, dashArray: '6 4' };
+    const estilo = { color: COBALTO, weight: 2.5, fillOpacity: 0.08, dashArray: '6 4' };
     const c = g.tipo === 'circulo' ? L.circle(g.centro, { ...estilo, radius: g.radioKm * 1000 }) : L.polygon(g.puntos, estilo);
     c.addTo(capas.geo);
     if (ajustar) mapa.fitBounds(c.getBounds(), { padding: [30, 30], maxZoom: 12 });
@@ -289,8 +311,8 @@
   $('#mPoligono').onclick = () => modo('poligono');
   function pintarVertices() {
     capas.vert.clearLayers();
-    st.vertices.forEach((v) => L.circleMarker(v, { radius: 4, color: '#0e5a7a', fillOpacity: 1 }).addTo(capas.vert));
-    if (st.vertices.length > 1) L.polyline(st.vertices, { color: '#0e5a7a', dashArray: '4 4' }).addTo(capas.vert);
+    st.vertices.forEach((v) => L.circleMarker(v, { radius: 4, color: COBALTO, fillOpacity: 1 }).addTo(capas.vert));
+    if (st.vertices.length > 1) L.polyline(st.vertices, { color: COBALTO, dashArray: '4 4' }).addTo(capas.vert);
     $('#nVert').textContent = String(st.vertices.length);
   }
   $('#radio').addEventListener('input', () => { $('#radioTxt').textContent = $('#radio').value; });
@@ -425,7 +447,7 @@
           <button type="button" id="fAlb" class="primario">Proponer albergues para este municipio</button>
         </div>`;
       capas.geo.clearLayers();
-      const c = L.circle(f.area.centro, { radius: f.area.radioKm * 1000, color: '#0e5a7a', weight: 2, fillOpacity: 0.05, dashArray: '6 4' }).addTo(capas.geo);
+      const c = L.circle(f.area.centro, { radius: f.area.radioKm * 1000, color: COBALTO, weight: 2, fillOpacity: 0.05, dashArray: '6 4' }).addTo(capas.geo);
       mapa.fitBounds(c.getBounds(), { padding: [20, 20], maxZoom: 12 });
       $('#fContar').onclick = () => { $('#fMun').value = mun; irA('contar'); const g = { tipo: 'circulo', centro: f.area.centro, radioKm: f.area.radioKm }; dibujarGeocerca(g); calcular(g); cargarLocalidades(); };
       $('#fAlb').onclick = () => { $('#aMun').value = mun; irA('albergues'); proponerAlbergues(); };
