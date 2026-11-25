@@ -92,6 +92,19 @@ test('API tabulador: resumen por capítulo y tipo', async () => {
   assert.equal(j.rechazados, 4);
 });
 
+test('API presupuesto: calcula y rechaza con la lista de errores', async () => {
+  const post = (b) => fetch(`${base}/api/presupuesto/calcular`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then(async (r) => ({ s: r.status, j: await r.json() }));
+  const ok = await post({ obra: 'Obra de prueba', cct: '21dpr1273g', factor: 1.2, renglones: [{ clave_ref: 'PRUEBA-001', cantidad: 10 }, { clave_ref: 'PRUEBA-004', cantidad: 1 }] });
+  assert.equal(ok.s, 200);
+  assert.equal(ok.j.cct, '21DPR1273G');
+  assert.equal(ok.j.plantel, null, 'sin planteles.csv no hay enlace');
+  assert.equal(ok.j.subtotal, 12600); // 12000 + 5 % de 12000
+  assert.equal(ok.j.total, 14616);
+  const mal = await post({ obra: '', renglones: [{ clave_ref: 'PRUEBA-001', cantidad: -1 }] });
+  assert.equal(mal.s, 400);
+  assert.equal(mal.j.errores.length, 2);
+});
+
 test('API tabulador: sin archivo o sin columnas avisa y el servidor sigue en pie', async () => {
   fs.renameSync(ARCHIVO, `${ARCHIVO}.bak`);
   const sin = await get('/api/tabulador');

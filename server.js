@@ -16,6 +16,7 @@ import { sugerirAlbergues } from './lib/albergues.js';
 import { calcularRuta } from './lib/rutas.js';
 import { parsearTrama } from './lib/trama.js';
 import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DATO, UNIDADES } from './lib/tabulador.js';
+import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.NEXO_DATA || path.join(DIR, 'data');
@@ -23,6 +24,7 @@ const PUERTO = Number(process.env.PORT || 3000);
 const fuentes = crearFuentes(path.join(DATA, 'cache'));
 const ARCHIVO_CONF = path.join(DATA, 'confirmaciones.json');
 const ARCHIVO_TAB = path.join(DATA, 'capcee', 'tabulador.csv');
+const ARCHIVO_PLANTELES = path.join(DATA, 'capcee', 'planteles.csv'); // opcional; aún no existe
 
 const estado = {
   iter: null, componentesV: [], sismos: null, sismoInfo: null, clima: null, maximos: null,
@@ -468,6 +470,17 @@ async function api(req, res, url) {
     if (requiereTabulador(res)) return;
     const t = tabulador();
     return enviar(res, 200, { ...resumenTabulador(t.conceptos), rechazados: t.rechazados.length, actualizado: t.actualizado });
+  }
+  // Calcula un presupuesto: {obra, cct, factor, renglones:[{clave_ref, cantidad}]}. No guarda nada.
+  if (ruta === '/api/presupuesto/calcular' && req.method === 'POST') {
+    if (requiereTabulador(res)) return;
+    const b = await leerCuerpo(req);
+    try {
+      return enviar(res, 200, calcularPresupuesto(b, tabulador().conceptos, cargarPlanteles(ARCHIVO_PLANTELES)));
+    } catch (e) {
+      if (e instanceof ErrorPresupuesto) return enviar(res, 400, { error: e.message, errores: e.errores });
+      throw e;
+    }
   }
 
   if (ruta === '/api/preparar/clima' && req.method === 'POST') {

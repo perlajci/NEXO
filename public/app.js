@@ -947,8 +947,9 @@
           <td data-l="Capítulo">${esc(c.capitulo)}</td>
           <td data-l="Partida">${esc(c.partida_generica) || '–'}</td>
           <td data-l="Tipo">${etiquetaTipo(c)}</td>
+          <td data-l="">${botonAgregar(c)}</td>
         </tr>`).join('')
-      : '<tr><td colspan="7" class="celda-vacia">Ningún concepto coincide. Prueba con otra palabra o quita los filtros.</td></tr>';
+      : '<tr><td colspan="8" class="celda-vacia">Ningún concepto coincide. Prueba con otra palabra o quita los filtros.</td></tr>';
     $('#tConteo').textContent = total ? `Conceptos ${fmt(ini + 1)}–${fmt(ini + filas.length)} de ${fmt(total)}` : '';
     $('#tPag').textContent = `Página ${tab.pagina + 1} de ${paginas}`;
     $('#tAnt').disabled = tab.pagina === 0;
@@ -974,6 +975,203 @@
   const globo = Object.assign(document.createElement('div'), { className: 'globo', hidden: true });
   globo.setAttribute('role', 'tooltip');
   document.body.append(globo);
+  // ---------- Presupuesto ----------
+  // La interfaz solo junta los datos; el cálculo lo hace el servidor (lib/presupuesto.js).
+  const pres = { renglones: [], pedido: 0 }; // renglones: [{ clave_ref, cantidad, concepto }]
+  const BORRADOR = 'piani.presupuesto.borrador';
+  const enPres = (clave) => pres.renglones.some((r) => r.clave_ref === clave);
+  function botonAgregar(c) {
+    const ya = enPres(c.clave_ref);
+    return `<button type="button" class="agregar${ya ? ' agregado' : ''}" data-agregar="${esc(c.clave_ref)}" aria-pressed="${ya}" aria-label="${esc(`${ya ? 'Ya está en el presupuesto' : 'Agregar al presupuesto'}: ${c.clave_ref}`)}">${ya ? 'Agregado' : 'Agregar'}</button>`;
+  }
+
+  function verVistaTab(cual) {
+    const pre = cual === 'pres';
+    $('#tVistaCat').hidden = pre;
+    $('#tVistaPres').hidden = !pre;
+    $('#tVerCat').classList.toggle('activo', !pre); $('#tVerCat').setAttribute('aria-pressed', String(!pre));
+    $('#tVerPres').classList.toggle('activo', pre); $('#tVerPres').setAttribute('aria-pressed', String(pre));
+    if (pre) recalcular(0);
+  }
+  $('#tVerCat').addEventListener('click', () => verVistaTab('cat'));
+  $('#tVerPres').addEventListener('click', () => verVistaTab('pres'));
+  $('#pIrCat').addEventListener('click', () => { verVistaTab('cat'); $('#tBuscar').focus(); });
+
+  $('#tTabla').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-agregar]');
+    if (!b) return;
+    const c = tab.conceptos.find((x) => x.clave_ref === b.dataset.agregar);
+    if (!c || enPres(c.clave_ref)) return;
+    pres.renglones.push({ clave_ref: c.clave_ref, cantidad: 1, concepto: c });
+    $('#pAnuncio').textContent = `${c.clave_ref} agregado al presupuesto.`;
+    cambioPres();
+    $(`#tTabla [data-agregar="${CSS.escape(c.clave_ref)}"]`)?.focus(); // el teclado sigue donde estaba
+  });
+
+  // Estructura de la tabla: solo cambia al agregar o quitar conceptos.
+  function pintarRenglonesPres() {
+    const n = pres.renglones.length;
+    $('#tNumPres').textContent = n;
+    $('#pVacio').hidden = n > 0;
+    $('#pLista').hidden = n === 0;
+    $('#pTabla tbody').innerHTML = pres.renglones.map(({ concepto: c, cantidad }) => {
+      const pctj = c.unidad === '%';
+      const id = `pc-${c.clave_ref.replace(/[^\w-]/g, '_')}`;
+      return `<tr data-clave="${esc(c.clave_ref)}">
+        <td data-l="Concepto"><code>${esc(c.clave_ref)}</code> ${etiquetaTipo(c)}<br><span id="${id}">${esc(c.concepto)}</span><span class="pct-base nota"></span></td>
+        <td data-l="Cantidad">${pctj
+          ? '<span class="cant-fija" title="Los conceptos en % llevan cantidad 1">1 vez</span>'
+          : `<span class="cant"><input class="cantidad" type="number" min="0" step="any" inputmode="decimal" value="${esc(cantidad)}" aria-label="${esc(`Cantidad en ${c.unidad} de ${c.clave_ref}`)}" aria-describedby="${id}"><span class="u">${esc(c.unidad)}</span></span>`}</td>
+        <td data-l="Precio sin IVA" class="n">${precioTab(c)}</td>
+        <td data-l="Factores" class="n factores" data-fcon="${pctj ? '' : esc(dos(c.factor_regional))}">${pctj ? 'No aplica' : `${dos(c.factor_regional)} × –`}</td>
+        <td data-l="Importe" class="n importe">–</td>
+        <td data-l=""><button type="button" class="quitar" data-quitar="${esc(c.clave_ref)}" aria-label="Quitar ${esc(c.clave_ref)} del presupuesto">Quitar</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  $('#pTabla').addEventListener('input', (e) => {
+    if (!e.target.matches('.cantidad')) return;
+    const clave = e.target.closest('tr').dataset.clave;
+    const r = pres.renglones.find((x) => x.clave_ref === clave);
+    r.cantidad = e.target.value === '' ? '' : Number(e.target.value);
+    const malo = !(Number(e.target.value) > 0);
+    e.target.setAttribute('aria-invalid', String(malo));
+    guardarBorrador();
+    recalcular();
+  });
+  $('#pTabla').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-quitar]');
+    if (!b) return;
+    const tr = b.closest('tr');
+    const vecino = (tr.nextElementSibling || tr.previousElementSibling)?.dataset.clave;
+    pres.renglones = pres.renglones.filter((x) => x.clave_ref !== b.dataset.quitar);
+    $('#pAnuncio').textContent = `${b.dataset.quitar} se quitó del presupuesto.`;
+    cambioPres();
+    // El foco pasa al botón Quitar del renglón vecino, o al nombre de la obra si ya no quedan.
+    (($(`#pTabla [data-quitar="${CSS.escape(vecino || '')}"]`)) || $('#pObra')).focus();
+  });
+  $('#pVaciar').addEventListener('click', () => {
+    if (!pres.renglones.length || !confirm('¿Quitar todos los conceptos del presupuesto?')) return;
+    pres.renglones = [];
+    $('#pAnuncio').textContent = 'Presupuesto vacío.';
+    cambioPres();
+    $('#pObra').focus();
+  });
+
+  // Validación inmediata de los campos (el servidor vuelve a validar todo).
+  function revisarCampos() {
+    const obra = $('#pObra').value.trim();
+    const faltaObra = !obra && pres.renglones.length > 0; // no regañar con el presupuesto vacío
+    $('#pObra').setAttribute('aria-invalid', String(faltaObra));
+    $('#pObraMsg').textContent = faltaObra ? 'Escribe el nombre de la obra para calcular.' : '';
+    const cct = $('#pCct').value.trim().toUpperCase();
+    let msg = '';
+    if (cct && cct.length !== 10) msg = `El CCT debe tener 10 caracteres (lleva ${cct.length}).`;
+    else if (cct && !cct.startsWith('21')) msg = 'El CCT debe empezar con 21 (Puebla).';
+    else if (cct && !/^21[A-Z]{3}\d{4}[A-Z]$/.test(cct)) msg = 'Formato esperado: 21DPR1273G.';
+    $('#pCct').setAttribute('aria-invalid', String(!!msg));
+    $('#pCctMsg').textContent = msg;
+    return !!obra && !msg;
+  }
+  $('#pCct').addEventListener('input', (e) => {
+    const p = e.target.selectionStart;
+    e.target.value = e.target.value.toUpperCase(); // se guarda en mayúsculas
+    e.target.setSelectionRange(p, p);
+  });
+  ['#pObra', '#pCct', '#pFactor'].forEach((s) => $(s).addEventListener('input', () => { guardarBorrador(); recalcular(); }));
+  $('#formPres').addEventListener('submit', (e) => e.preventDefault());
+
+  function cambioPres() {
+    pintarRenglonesPres();
+    if (tab.conceptos.length) pintarTablaTab(); // botones Agregar/Agregado del catálogo
+    guardarBorrador();
+    recalcular(0);
+  }
+
+  let esperaPres = null;
+  function recalcular(ms = 300) {
+    clearTimeout(esperaPres);
+    esperaPres = setTimeout(calcularPres, ms);
+  }
+  async function calcularPres() {
+    const camposOk = revisarCampos();
+    const ocultar = () => { $('#pResultado').hidden = true; };
+    if (!pres.renglones.length) { $('#pErrores').hidden = true; ocultar(); return; }
+    if (!camposOk) { $('#pErrores').hidden = true; ocultar(); return; }
+    const n = ++pres.pedido;
+    const cuerpo = {
+      obra: $('#pObra').value, cct: $('#pCct').value, factor: $('#pFactor').value,
+      renglones: pres.renglones.map((r) => ({ clave_ref: r.clave_ref, cantidad: r.cantidad })),
+    };
+    const resp = await fetch('/api/presupuesto/calcular', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) }).catch(() => null);
+    if (n !== pres.pedido) return;
+    const j = resp ? await resp.json().catch(() => ({})) : { error: 'No hay conexión con el servidor.' };
+    if (!resp || !resp.ok) {
+      ocultar();
+      const lista = j.errores?.length ? j.errores : [j.error || 'No se pudo calcular el presupuesto.'];
+      $('#pErrores').hidden = false;
+      $('#pErrores').innerHTML = `<b>Revisa el presupuesto:</b><ul>${lista.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+      $$('#pTabla .importe').forEach((td) => { td.textContent = '–'; });
+      return;
+    }
+    $('#pErrores').hidden = true;
+    pintarResultadoPres(j);
+  }
+
+  function pintarResultadoPres(p) {
+    for (const r of p.renglones) {
+      const tr = $(`#pTabla tr[data-clave="${CSS.escape(r.clave_ref)}"]`);
+      if (!tr) continue;
+      tr.querySelector('.importe').textContent = dinero(r.importe);
+      const f = tr.querySelector('.factores');
+      f.textContent = r.factor_presupuesto === null ? 'No aplica' : `${dos(r.factor_concepto)} × ${dos(r.factor_presupuesto)}`;
+      f.title = r.factor_presupuesto === null ? 'Los conceptos en % no llevan factores' : `Concepto ${dos(r.factor_concepto)} × presupuesto ${dos(r.factor_presupuesto)}`;
+      tr.querySelector('.pct-base').textContent = r.porcentaje_de_base === null ? '' : ` ${dos(r.precio)} % de ${dinero(r.porcentaje_de_base)} (obra del capítulo 6000)`;
+    }
+    $('#pAvisoEst').hidden = !p.aviso;
+    $('#pAvisoEst').textContent = p.aviso || '';
+    $('#pSub').textContent = dinero(p.subtotal);
+    $('#pIva').textContent = dinero(p.iva);
+    $('#pTot').textContent = dinero(p.total);
+    $('#pDesglose').innerHTML = p.desglose.map((c) => `
+      <div class="des-cap">
+        <div class="des-fila des-n1"><span>Capítulo ${esc(c.capitulo)}</span><b>${dinero(c.importe)}</b></div>
+        ${c.genericas.map((g) => `
+          <div class="des-fila des-n2"><span>${esc(g.partida)}</span><b>${dinero(g.importe)}</b></div>
+          ${g.especificas.map((s) => `
+            <div class="des-fila des-n3"><span class="${s.partida === 'Pendiente COGAPE' ? 'pendiente' : ''}">${esc(s.partida)} <small>${s.claves.map(esc).join(', ')}</small></span><b>${dinero(s.importe)}</b></div>`).join('')}`).join('')}
+      </div>`).join('');
+    $('#pResultado').hidden = false;
+  }
+
+  // Borrador en este navegador (comodidad; guardar de verdad llega en el paso 4).
+  function guardarBorrador() {
+    try {
+      localStorage.setItem(BORRADOR, JSON.stringify({
+        obra: $('#pObra').value, cct: $('#pCct').value, factor: $('#pFactor').value,
+        renglones: pres.renglones.map((r) => ({ clave_ref: r.clave_ref, cantidad: r.cantidad })),
+      }));
+    } catch { /* sin almacenamiento: no pasa nada */ }
+  }
+  async function restaurarBorrador() {
+    let b = null;
+    try { b = JSON.parse(localStorage.getItem(BORRADOR) || 'null'); } catch { b = null; }
+    if (!b) return;
+    $('#pObra').value = b.obra || '';
+    $('#pCct').value = b.cct || '';
+    $('#pFactor').value = b.factor || '1.00';
+    if (Array.isArray(b.renglones) && b.renglones.length) {
+      const cat = await apiTab('/api/tabulador').catch(() => null);
+      if (cat) {
+        const porClave = new Map(cat.conceptos.map((c) => [c.clave_ref, c]));
+        pres.renglones = b.renglones.filter((r) => porClave.has(r.clave_ref)).map((r) => ({ ...r, concepto: porClave.get(r.clave_ref) }));
+      }
+    }
+    pintarRenglonesPres();
+  }
+  restaurarBorrador();
+
   let globoDe = null; // etiqueta a la que pertenece el globo visible
   function colocarGlobo() {
     if (!globoDe) return;

@@ -262,6 +262,12 @@
       <div class="como"><b>Cómo se usa</b> Busca un concepto o filtra por capítulo y tipo de dato. Pasa el cursor (o toca) la etiqueta de tipo para ver de dónde sale cada precio. Los precios no incluyen IVA.</div>
       <div id="tAviso" class="aviso-sec" role="alert" hidden></div>
       <div id="tContenido">
+        <div class="segmento" role="group" aria-label="Vista del tabulador">
+          <button type="button" id="tVerCat" class="activo" aria-pressed="true">Catálogo</button>
+          <button type="button" id="tVerPres" aria-pressed="false">Armar presupuesto <span id="tNumPres" class="num-pres">0</span></button>
+        </div>
+        <p id="pAnuncio" class="sr" aria-live="polite"></p>
+        <div id="tVistaCat">
         <div id="tKpis" class="kpis k3"></div>
         <label>Buscar <input id="tBuscar" type="search" placeholder="Clave, concepto o partida" autocomplete="off"></label>
         <div class="fila">
@@ -280,13 +286,53 @@
           </select></label>
         </div>
         <p id="tConteo" class="nota" aria-live="polite"></p>
-        <div class="scroll alto"><table id="tTabla" class="stack"><thead><tr><th>Clave</th><th>Concepto</th><th>Unidad</th><th class="n">Precio sin IVA</th><th>Capítulo</th><th>Partida genérica</th><th>Tipo</th></tr></thead><tbody></tbody></table></div>
+        <div class="scroll alto"><table id="tTabla" class="stack"><thead><tr><th>Clave</th><th>Concepto</th><th>Unidad</th><th class="n">Precio sin IVA</th><th>Capítulo</th><th>Partida genérica</th><th>Tipo</th><th><span class="sr">Presupuesto</span></th></tr></thead><tbody></tbody></table></div>
         <div class="paginador">
           <button type="button" id="tAnt">Anterior</button>
           <span id="tPag"></span>
           <button type="button" id="tSig">Siguiente</button>
         </div>
         <details id="tRechazados" class="caja" hidden></details>
+        </div>
+
+        <!-- PRESUPUESTO -->
+        <div id="tVistaPres" hidden>
+          <form id="formPres" class="form" novalidate>
+            <label>Nombre de la obra
+              <input id="pObra" maxlength="120" required aria-describedby="pObraMsg" placeholder="Rehabilitación de 3 aulas, Primaria Benito Juárez">
+            </label>
+            <p id="pObraMsg" class="campo-msg"></p>
+            <div class="fila">
+              <label>CCT del plantel <small class="opcional">(opcional)</small>
+                <input id="pCct" maxlength="10" placeholder="21DPR1273G" autocomplete="off" spellcheck="false" autocapitalize="characters" aria-describedby="pCctMsg">
+              </label>
+              <label>Factor del presupuesto
+                <input id="pFactor" type="number" min="0.01" max="10" step="0.01" value="1.00" inputmode="decimal" aria-describedby="pFactorAyuda">
+              </label>
+            </div>
+            <p id="pCctMsg" class="campo-msg"></p>
+            <p id="pFactorAyuda" class="nota">El factor ajusta a Puebla precios tomados de otro estado. Se multiplica por el factor de cada concepto del tabulador; no se aplica a los conceptos en %.</p>
+          </form>
+
+          <div id="pVacio" class="vacio">Todavía no hay conceptos. Agrégalos desde el <button type="button" class="enlace" id="pIrCat">catálogo</button>.</div>
+          <div id="pLista" hidden>
+            <div class="tabla-pres"><table id="pTabla" class="stack"><thead><tr><th>Concepto</th><th>Cantidad</th><th class="n">Precio sin IVA</th><th class="n"><abbr title="Factor del concepto (tabulador) × factor del presupuesto">Factores</abbr></th><th class="n">Importe</th><th><span class="sr">Quitar</span></th></tr></thead><tbody></tbody></table></div>
+            <p class="nota">Factores = factor del concepto (tabulador) × factor del presupuesto.</p>
+          </div>
+
+          <div id="pErrores" class="aviso-sec" role="alert" hidden></div>
+          <div id="pResultado" hidden>
+            <p id="pAvisoEst" class="aviso-estimado" role="note" hidden></p>
+            <dl class="totales">
+              <div><dt>Subtotal</dt><dd id="pSub">–</dd></div>
+              <div><dt>IVA 16 %</dt><dd id="pIva">–</dd></div>
+              <div class="total"><dt>Total</dt><dd id="pTot">–</dd></div>
+            </dl>
+            <h2>Desglose por partida</h2>
+            <div id="pDesglose" class="desglose"></div>
+            <button type="button" id="pVaciar" class="ancho100">Vaciar presupuesto</button>
+          </div>
+        </div>
       </div>
     </section>
 
