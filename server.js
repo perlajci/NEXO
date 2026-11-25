@@ -19,6 +19,9 @@ import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DAT
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
 import { crearAlmacenJSON } from './lib/almacen.js';
+import {
+  validarCSV, compararTabuladores, reemplazarTabulador, listarHistorial, claveCorrecta, RE_RESPALDO, LIMITE_BYTES,
+} from './lib/tabulador-admin.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.NEXO_DATA || path.join(DIR, 'data');
@@ -30,7 +33,9 @@ const ARCHIVO_PLANTELES = path.join(DATA, 'capcee', 'planteles.csv'); // opciona
 // Presupuestos guardados: misma capa que Operación (archivo JSON en data/). Para usar una base
 // de datos, cambia solo esta línea por un objeto con guardar/listar/obtener/borrar (ver lib/almacen.js).
 const presupuestos = crearAlmacenJSON(path.join(DATA, 'presupuestos.json'));
-const AVISO_DISCO = 'Los presupuestos se guardan en un archivo del servidor. En el plan gratuito de Render el disco se borra al reiniciar: exporta a CSV los que necesites conservar.';
+const DIR_HISTORIAL_TAB = path.join(DATA, 'capcee', 'historial');
+const AVISO_RENDER_TAB = 'En el plan gratuito de Render el disco se borra al reiniciar: el tabulador cargado aquí y su historial se pierden y vuelve el CSV del repositorio. Para conservarlo, sube el CSV nuevo al repositorio (data/capcee/tabulador.csv) o usa una base de datos.';
+const AVISO_DISCO ='Los presupuestos se guardan en un archivo del servidor. En el plan gratuito de Render el disco se borra al reiniciar: exporta a CSV los que necesites conservar.';
 
 const estado = {
   iter: null, componentesV: [], sismos: null, sismoInfo: null, clima: null, maximos: null,
@@ -109,6 +114,31 @@ function tabulador() {
   if (tabCache.marca !== marca) tabCache = { marca, datos: leerTabulador(ARCHIVO_TAB) };
   return tabCache.datos;
 }
+const olvidarTabulador = () => { tabCache = { marca: null, datos: null }; };
+// Identifica la versión vigente para el encabezado X-Huella-Base (también sin archivo o con uno dañado).
+const baseTabulador = (t = tabulador()) => (t.ok ? t.huella : (fs.existsSync(ARCHIVO_TAB) ? 'invalido' : 'ninguno'));
+
+// La carga de tabulador solo funciona si el servidor tiene TABULADOR_ADMIN_KEY y la petición
+// manda esa misma clave en el encabezado X-Admin-Key. La clave nunca se guarda en el código.
+function autorizarAdmin(req, res) {
+  const esperada = process.env.TABULADOR_ADMIN_KEY;
+  if (!esperada) { enviar(res, 403, { error: 'La carga de tabulador está desactivada: el servidor no tiene la variable TABULADOR_ADMIN_KEY.' }); return false; }
+  const enviada = req.headers['x-admin-key'];
+  if (!enviada) { enviar(res, 401, { error: 'Falta la clave de administración.' }); return false; }
+  if (!claveCorrecta(enviada, esperada)) { enviar(res, 403, { error: 'La clave de administración no es correcta.' }); return false; }
+  return true;
+}
+async function leerBytes(req, limite) {
+  const partes = [];
+  let n = 0;
+  for await (const c of req) {
+    n += c.length;
+    if (n > limite) throw Object.assign(new Error('El archivo pasa del límite de 1 MB.'), { status: 413 });
+    partes.push(c);
+  }
+  return Buffer.concat(partes);
+}
+
 // Si el tabulador no se pudo leer, responde 409 con un aviso para mostrar en la sección.
 const requiereTabulador = (res) => {
   const t = tabulador();
@@ -477,6 +507,57 @@ async function api(req, res, url) {
     const t = tabulador();
     return enviar(res, 200, { ...resumenTabulador(t.conceptos), rechazados: t.rechazados.length, actualizado: t.actualizado });
   }
+  // ---------- Actualizar el tabulador (protegido con TABULADOR_ADMIN_KEY) ----------
+  if (ruta === '/api/tabulador/historial' && req.method === 'GET') {
+    const t = tabulador();
+    return enviar(res, 200, {
+      habilitado: !!process.env.TABULADOR_ADMIN_KEY,
+      aviso: AVISO_RENDER_TAB,
+      actual: t.ok ? { huella: t.huella, conceptos: t.conceptos.length, actualizado: t.actualizado } : null,
+      versiones: listarHistorial(DIR_HISTORIAL_TAB),
+    });
+  }
+  // Valida y compara un CSV nuevo SIN aplicarlo. Cuerpo: el archivo tal cual (text/csv).
+  if (ruta === '/api/tabulador/previsualizar' && req.method === 'POST') {
+    if (!autorizarAdmin(req, res)) return;
+    const v = validarCSV(await leerBytes(req, LIMITE_BYTES));
+    if (!v.ok) return enviar(res, 422, { error: 'El CSV tiene errores; no se aplicó nada.', errores: v.errores });
+    const t = tabulador();
+    return enviar(res, 200, {
+      base: baseTabulador(t),
+      huellaActual: t.ok ? t.huella : null,
+      huellaNueva: v.huella,
+      conceptosActuales: t.ok ? t.conceptos.length : 0,
+      conceptosNuevos: v.conceptos.length,
+      diferencias: compararTabuladores(t.ok ? t.conceptos : [], v.conceptos, presupuestos.listar()),
+    });
+  }
+  // Aplica el CSV previsualizado. Encabezados: X-Huella-Base (tabulador vigente al previsualizar) y
+  // X-Huella-Nueva (el archivo previsualizado); si alguno no coincide, no se aplica (409).
+  if (ruta === '/api/tabulador/aplicar' && req.method === 'POST') {
+    if (!autorizarAdmin(req, res)) return;
+    const v = validarCSV(await leerBytes(req, LIMITE_BYTES));
+    if (!v.ok) return enviar(res, 422, { error: 'El CSV tiene errores; no se aplicó nada.', errores: v.errores });
+    if (req.headers['x-huella-base'] !== baseTabulador()) return enviar(res, 409, { error: 'El tabulador cambió desde que hiciste la previsualización. Vuelve a previsualizar.' });
+    if (req.headers['x-huella-nueva'] !== v.huella) return enviar(res, 409, { error: 'El archivo no es el mismo que se previsualizó. Vuelve a previsualizar.' });
+    const r = reemplazarTabulador({ ruta: ARCHIVO_TAB, dirHistorial: DIR_HISTORIAL_TAB, contenido: v.contenido });
+    olvidarTabulador();
+    return enviar(res, 200, { ok: true, respaldo: r.respaldo, huella: r.huella, conceptos: tabulador().conceptos.length });
+  }
+  // Restaura una versión del historial (respaldando antes la vigente). Cuerpo: {archivo}.
+  if (ruta === '/api/tabulador/restaurar' && req.method === 'POST') {
+    if (!autorizarAdmin(req, res)) return;
+    const { archivo } = await leerCuerpo(req);
+    if (typeof archivo !== 'string' || !RE_RESPALDO.test(archivo)) return enviar(res, 400, { error: 'Nombre de versión inválido.' });
+    const origen = path.join(DIR_HISTORIAL_TAB, archivo);
+    if (!fs.existsSync(origen)) return enviar(res, 404, { error: 'Esa versión ya no está en el historial.' });
+    const v = validarCSV(fs.readFileSync(origen));
+    if (!v.ok) return enviar(res, 422, { error: 'Esa versión tiene errores y no se puede restaurar.', errores: v.errores });
+    const r = reemplazarTabulador({ ruta: ARCHIVO_TAB, dirHistorial: DIR_HISTORIAL_TAB, contenido: v.contenido });
+    olvidarTabulador();
+    return enviar(res, 200, { ok: true, restaurado: archivo, respaldo: r.respaldo, huella: r.huella, conceptos: tabulador().conceptos.length });
+  }
+
   // Calcula un presupuesto: {obra, cct, factor, renglones:[{clave_ref, cantidad}]}. No guarda nada.
   if (ruta === '/api/presupuesto/calcular' && req.method === 'POST') {
     if (requiereTabulador(res)) return;
@@ -567,7 +648,7 @@ export const servidor = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else estatico(res, url.pathname);
   } catch (e) {
-    enviar(res, 400, { error: e.message });
+    if (!res.headersSent) enviar(res, e.status || 400, { error: e.message });
   }
 });
 

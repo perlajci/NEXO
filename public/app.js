@@ -985,7 +985,7 @@
     return `<button type="button" class="agregar${ya ? ' agregado' : ''}" data-agregar="${esc(c.clave_ref)}" aria-pressed="${ya}" aria-label="${esc(`${ya ? 'Ya está en el presupuesto' : 'Agregar al presupuesto'}: ${c.clave_ref}`)}">${ya ? 'Agregado' : 'Agregar'}</button>`;
   }
 
-  const VISTAS_TAB = { cat: ['#tVistaCat', '#tVerCat'], pres: ['#tVistaPres', '#tVerPres'], guard: ['#tVistaGuard', '#tVerGuard'] };
+  const VISTAS_TAB = { cat: ['#tVistaCat', '#tVerCat'], pres: ['#tVistaPres', '#tVerPres'], guard: ['#tVistaGuard', '#tVerGuard'], admin: ['#tVistaAdmin', '#tVerAdmin'] };
   function verVistaTab(cual) {
     for (const [k, [vista, boton]] of Object.entries(VISTAS_TAB)) {
       const activa = k === cual;
@@ -995,7 +995,9 @@
     }
     if (cual === 'pres') recalcular(0);
     if (cual === 'guard') { mostrarListaGuard(); cargarGuardados(); }
+    if (cual === 'admin') cargarAdmin();
   }
+  $('#tVerAdmin').addEventListener('click', () => verVistaTab('admin'));
   $('#tVerCat').addEventListener('click', () => verVistaTab('cat'));
   $('#tVerPres').addEventListener('click', () => verVistaTab('pres'));
   $('#tVerGuard').addEventListener('click', () => verVistaTab('guard'));
@@ -1003,11 +1005,12 @@
 
   // Diálogo de confirmación propio de la página (no usa confirm() del navegador).
   // Abre con el foco en "Cancelar"; Escape también cancela. Devuelve true si se acepta.
-  function confirmar({ titulo, texto, aceptar = 'Borrar' }) {
+  function confirmar({ titulo, texto, aceptar = 'Borrar', peligro = true }) {
     const d = $('#dlgConfirmar');
     $('#dlgTitulo').textContent = titulo;
     $('#dlgTexto').textContent = texto;
     $('#dlgSi').textContent = aceptar;
+    $('#dlgSi').className = peligro ? 'peligro' : 'primario';
     const regreso = document.activeElement;
     return new Promise((resolver) => {
       d.returnValue = 'no';
@@ -1331,6 +1334,183 @@
     const b = $(`#gFichaCont [data-recursos="${CSS.escape(id)}"]`);
     if (b) { b.disabled = true; b.textContent = 'Disponible en Recursos CAPCEE'; }
     $('#gRecursosNota').textContent = `Marcado para Recursos CAPCEE: ${fechaMX(j.marcadoEn)}`;
+  }
+
+  // ---------- Actualizar precios (cargar tabulador) ----------
+  // Protegido en el servidor con TABULADOR_ADMIN_KEY. La clave solo vive en el campo; no se guarda.
+  const adm = { habilitado: false, previa: null, archivo: null, actual: null };
+  const precioU = (v, unidad) => (unidad === '%' ? `${dos(v)} %` : dinero(v));
+  const signo = (x) => (x > 0 ? '+' : x < 0 ? '−' : '');
+  const pl = (n, uno, varios) => `${fmt(n)} ${n === 1 ? uno : varios}`;
+
+  async function cargarAdmin() {
+    let h;
+    try { h = await apiTab('/api/tabulador/historial'); } catch (e) { $('#aErrores').hidden = false; $('#aErrores').textContent = e.message; return; }
+    adm.habilitado = h.habilitado;
+    adm.actual = h.actual;
+    $('#aAvisoRender').textContent = h.aviso;
+    $('#aDeshabilitado').hidden = h.habilitado;
+    for (const s of ['#aClave', '#aArchivo', '#aCargar']) $(s).disabled = !h.habilitado;
+    if (h.habilitado) $('#aCargar').removeAttribute('aria-describedby'); else $('#aCargar').setAttribute('aria-describedby', 'aDeshabTxt');
+    $('#aActual').innerHTML = h.actual
+      ? `<div><dt>Tabulador vigente</dt><dd>${fmt(h.actual.conceptos)} conceptos</dd></div>
+         <div><dt>Huella</dt><dd><code title="${esc(h.actual.huella)}">${esc(h.actual.huella.slice(0, 12))}…</code></dd></div>
+         <div><dt>Archivo modificado</dt><dd>${esc(fechaMX(h.actual.actualizado))}</dd></div>`
+      : '<div><dt>Tabulador vigente</dt><dd>No hay un tabulador válido cargado</dd></div>';
+    $('#aHistVacio').hidden = h.versiones.length > 0;
+    $('#aHistCaja').hidden = !h.versiones.length;
+    $('#aHist tbody').innerHTML = h.versiones.map((v) => `<tr>
+        <td data-l="Fecha">${esc(v.fecha)}</td>
+        <td data-l="Huella"><code title="${esc(v.huella)}">${esc(v.huella.slice(0, 12))}…</code></td>
+        <td data-l="Conceptos" class="n">${v.valido ? fmt(v.conceptos) : 'con errores'}</td>
+        <td data-l=""><button type="button" data-restaurar="${esc(v.archivo)}" data-fecha="${esc(v.fecha)}" data-conceptos="${esc(v.conceptos ?? '')}" ${h.habilitado && v.valido ? '' : 'disabled'} aria-label="${esc(`Restaurar la versión del ${v.fecha}`)}">Restaurar</button></td>
+      </tr>`).join('');
+  }
+
+  function erroresAdmin(titulo, lista) {
+    $('#aErrores').hidden = false;
+    $('#aErrores').innerHTML = `<b>${esc(titulo)}</b>${lista?.length ? `<ul>${lista.map((e) => `<li>${e.fila ? `Renglón ${e.fila}` : 'Archivo'}${e.clave_ref ? ` (${esc(e.clave_ref)})` : ''}: ${esc((e.motivos || [e]).join('; '))}</li>`).join('')}</ul>` : ''}`;
+  }
+  function limpiarPrevia() { adm.previa = null; $('#aPrevia').hidden = true; $('#aPrevia').innerHTML = ''; }
+  $('#aArchivo').addEventListener('change', () => { limpiarPrevia(); $('#aErrores').hidden = true; mensajeAdmin(''); });
+  function mensajeAdmin(t) { $('#aMsg').textContent = t; $('#aMsg').hidden = !t; }
+  const pedirClave = () => {
+    const clave = $('#aClave').value;
+    if (!clave) { erroresAdmin('Escribe la clave de administración.'); $('#aClave').focus(); }
+    return clave;
+  };
+
+  $('#formCarga').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!adm.habilitado) return;
+    $('#aErrores').hidden = true; mensajeAdmin(''); limpiarPrevia();
+    const clave = pedirClave();
+    if (!clave) return;
+    const archivo = $('#aArchivo').files[0];
+    if (!archivo) { erroresAdmin('Elige el archivo CSV del tabulador nuevo.'); $('#aArchivo').focus(); return; }
+    if (archivo.size > 1024 * 1024) { erroresAdmin('El archivo pesa más de 1 MB.'); return; }
+    $('#aCargar').disabled = true; $('#aCargar').textContent = 'Revisando el archivo…';
+    try {
+      // Se manda el archivo tal cual (con su BOM); el servidor valida y compara sin aplicar.
+      const r = await fetch('/api/tabulador/previsualizar', { method: 'POST', headers: { 'Content-Type': 'text/csv', 'X-Admin-Key': clave }, body: archivo });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { erroresAdmin(j.error || `Error ${r.status}`, j.errores); return; }
+      adm.previa = j; adm.archivo = archivo;
+      pintarPrevia(j);
+    } catch { erroresAdmin('No hay conexión con el servidor.'); } finally {
+      $('#aCargar').disabled = !adm.habilitado; $('#aCargar').textContent = 'Cargar tabulador';
+    }
+  });
+
+  function pintarPrevia(j) {
+    const d = j.diferencias;
+    const usado = (n) => (n ? `<span class="etq-usado">Usado en ${n} presupuesto${n === 1 ? '' : 's'} guardado${n === 1 ? '' : 's'}</span>` : '');
+    const cambio = (c, unidad) => {
+      if (c.campo === 'precio') return '';
+      const v = (x) => (c.campo === 'factor_regional' ? dos(x) : (x === '' ? '(vacía)' : esc(x)));
+      return `<li><b>${esc(c.nombre)}:</b> ${v(c.antes)} → ${v(c.despues)}</li>`;
+    };
+    const tablaMod = d.modificados.map((m) => `<tr class="${m.presupuestos ? 'usado' : ''}">
+        <td data-l="Concepto"><code>${esc(m.clave_ref)}</code><br>${esc(m.concepto)}${m.presupuestos ? `<br>${usado(m.presupuestos)}` : ''}</td>
+        <td data-l="Qué cambió"><ul class="cambios">
+          ${m.precio ? `<li><b>precio:</b> ${precioU(m.precio.antes, m.unidad)} → ${precioU(m.precio.despues, m.unidad)} <span class="dif ${m.precio.difMxn > 0 ? 'sube' : 'baja'}">${signo(m.precio.difMxn)}${m.unidad === '%' ? `${dos(Math.abs(m.precio.difMxn))} pts` : dinero(Math.abs(m.precio.difMxn))} (${signo(m.precio.difPct)}${fmt(Math.abs(m.precio.difPct), 1)} %)</span></li>` : ''}
+          ${m.cambios.map((c) => cambio(c, m.unidad)).join('')}
+        </ul></td>
+      </tr>`).join('');
+    const tablaElim = d.eliminados.map((x) => `<tr class="${x.presupuestos ? 'usado' : ''}">
+        <td data-l="Concepto"><code>${esc(x.clave_ref)}</code><br>${esc(x.concepto)}${x.presupuestos ? `<br>${usado(x.presupuestos)}` : ''}</td>
+        <td data-l="Precio" class="n">${precioU(x.precio, x.unidad)}</td>
+      </tr>`).join('');
+    const tablaNuevos = d.nuevos.map((x) => `<tr>
+        <td data-l="Concepto"><code>${esc(x.clave_ref)}</code><br>${esc(x.concepto)}</td>
+        <td data-l="Precio" class="n">${precioU(x.precio, x.unidad)} <small>/ ${esc(x.unidad)}</small></td>
+        <td data-l="Tipo">${etiquetaTipo(x)}</td>
+      </tr>`).join('');
+    $('#aPrevia').innerHTML = `
+      <h2 tabindex="-1" id="aPreviaTitulo">Cambios contra el tabulador vigente</h2>
+      <p class="nota">Esto es una vista previa: todavía no se aplicó nada. Archivo nuevo: ${fmt(j.conceptosNuevos)} conceptos (vigente: ${fmt(j.conceptosActuales)}).</p>
+      <ul class="resumen-cambios">
+        <li><b>${fmt(d.nuevos.length)}</b> ${d.nuevos.length === 1 ? 'nuevo' : 'nuevos'}</li>
+        <li><b>${fmt(d.eliminados.length)}</b> ${d.eliminados.length === 1 ? 'eliminado' : 'eliminados'}</li>
+        <li><b>${fmt(d.modificados.length)}</b> ${d.modificados.length === 1 ? 'modificado' : 'modificados'}</li>
+        <li><b>${fmt(d.sinCambio)}</b> sin cambio</li>
+      </ul>
+      ${d.presupuestosAfectados ? `<div class="aviso-anterior"><b>${fmt(d.presupuestosAfectados)} presupuesto${d.presupuestosAfectados === 1 ? '' : 's'} guardado${d.presupuestosAfectados === 1 ? '' : 's'} usa${d.presupuestosAfectados === 1 ? '' : 'n'} conceptos que se eliminan o cambian</b> (resaltados abajo). No cambian: conservan los precios con los que se guardaron (copia fija) y se marcarán como “calculado con tabulador anterior”.</div>` : ''}
+      ${d.identico ? '<p class="msg-ok">El archivo es igual al tabulador vigente: no hay nada que aplicar.</p>' : ''}
+      ${d.modificados.length ? `<h3>Modificados</h3><div class="tabla-pres"><table class="stack tabla-dif"><thead><tr><th>Concepto</th><th>Qué cambió</th></tr></thead><tbody>${tablaMod}</tbody></table></div>` : ''}
+      ${d.eliminados.length ? `<h3>Eliminados</h3><div class="tabla-pres"><table class="stack tabla-dif"><thead><tr><th>Concepto</th><th class="n">Precio</th></tr></thead><tbody>${tablaElim}</tbody></table></div>` : ''}
+      ${d.nuevos.length ? `<h3>Nuevos</h3><div class="tabla-pres"><table class="stack tabla-dif"><thead><tr><th>Concepto</th><th class="n">Precio</th><th>Tipo</th></tr></thead><tbody>${tablaNuevos}</tbody></table></div>` : ''}
+      ${d.identico ? '' : `<div class="fila acciones-pres">
+        <button type="button" id="aAplicar" class="primario">Aplicar tabulador nuevo</button>
+        <button type="button" id="aDescartar">Descartar</button>
+      </div>`}`;
+    $('#aPrevia').hidden = false;
+    $('#aPreviaTitulo').focus();
+  }
+
+  $('#aPrevia').addEventListener('click', async (e) => {
+    if (e.target.id === 'aDescartar') { limpiarPrevia(); $('#aArchivo').value = ''; $('#aArchivo').focus(); return; }
+    if (e.target.id !== 'aAplicar' || !adm.previa) return;
+    const d = adm.previa.diferencias;
+    const ok = await confirmar({
+      titulo: '¿Aplicar el tabulador nuevo?',
+      texto: `Se reemplazará el tabulador vigente (${adm.previa.conceptosActuales} conceptos) por el nuevo (${adm.previa.conceptosNuevos}): ${pl(d.nuevos.length, 'nuevo', 'nuevos')}, ${pl(d.eliminados.length, 'eliminado', 'eliminados')} y ${pl(d.modificados.length, 'modificado', 'modificados')}. El vigente se guarda en el historial y se puede restaurar. Los presupuestos guardados no cambian.`,
+      aceptar: 'Aplicar', peligro: false,
+    });
+    if (!ok) return;
+    const clave = pedirClave();
+    if (!clave) return;
+    const b = e.target;
+    b.disabled = true; b.textContent = 'Aplicando…';
+    try {
+      const r = await fetch('/api/tabulador/aplicar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv', 'X-Admin-Key': clave, 'X-Huella-Base': adm.previa.base, 'X-Huella-Nueva': adm.previa.huellaNueva },
+        body: adm.archivo,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { erroresAdmin(j.error || `Error ${r.status}`, j.errores); b.disabled = false; b.textContent = 'Aplicar tabulador nuevo'; return; }
+      limpiarPrevia();
+      $('#aArchivo').value = '';
+      await tabuladorCambio();
+      mensajeAdmin(`Listo: el tabulador nuevo (${j.conceptos} conceptos) ya está en uso.${j.respaldo ? ` El anterior quedó en el historial como ${j.respaldo}.` : ''}`);
+      $('#aMsg').setAttribute('tabindex', '-1'); $('#aMsg').focus();
+    } catch { erroresAdmin('No hay conexión con el servidor; no se aplicó nada.'); b.disabled = false; b.textContent = 'Aplicar tabulador nuevo'; }
+  });
+
+  $('#aHist').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-restaurar]');
+    if (!b) return;
+    $('#aErrores').hidden = true; mensajeAdmin('');
+    const ok = await confirmar({
+      titulo: '¿Restaurar esta versión?',
+      texto: `Se usará el tabulador del ${b.dataset.fecha} (${b.dataset.conceptos} conceptos). El vigente se guarda antes en el historial. Los presupuestos guardados no cambian.`,
+      aceptar: 'Restaurar', peligro: false,
+    });
+    if (!ok) return;
+    const clave = pedirClave();
+    if (!clave) return;
+    const r = await fetch('/api/tabulador/restaurar', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': clave }, body: JSON.stringify({ archivo: b.dataset.restaurar }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : { error: 'No hay conexión con el servidor.' };
+    if (!r || !r.ok) { erroresAdmin(j.error || 'No se pudo restaurar.', j.errores); return; }
+    limpiarPrevia();
+    await tabuladorCambio();
+    mensajeAdmin(`Listo: se restauró la versión del ${b.dataset.fecha} (${j.conceptos} conceptos). La que estaba quedó en el historial.`);
+    $('#aMsg').setAttribute('tabindex', '-1'); $('#aMsg').focus();
+  });
+
+  // Tras aplicar o restaurar: catálogo, indicadores, guardados (etiquetas) e historial, sin recargar la página.
+  async function tabuladorCambio() {
+    await Promise.all([cargarTabulador(), cargarGuardados(), cargarAdmin()]);
+    // Los conceptos del presupuesto en curso toman los datos nuevos; los que ya no existen se quitan.
+    const cat = await apiTab('/api/tabulador').catch(() => null);
+    if (cat && pres.renglones.length) {
+      const porClave = new Map(cat.conceptos.map((c) => [c.clave_ref, c]));
+      const antes = pres.renglones.length;
+      pres.renglones = pres.renglones.filter((r) => porClave.has(r.clave_ref)).map((r) => ({ ...r, concepto: porClave.get(r.clave_ref) }));
+      if (pres.renglones.length < antes) $('#pAnuncio').textContent = `${antes - pres.renglones.length} concepto(s) del presupuesto en curso ya no existen y se quitaron.`;
+      cambioPres();
+    }
   }
 
   // Borrador en este navegador (el guardado real está en el servidor, ver Guardados).

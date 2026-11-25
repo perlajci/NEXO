@@ -266,6 +266,7 @@
           <button type="button" id="tVerCat" class="activo" aria-pressed="true">Catálogo</button>
           <button type="button" id="tVerPres" aria-pressed="false">Armar presupuesto <span id="tNumPres" class="num-pres">0</span></button>
           <button type="button" id="tVerGuard" aria-pressed="false">Guardados <span id="tNumGuard" class="num-pres">0</span></button>
+          <button type="button" id="tVerAdmin" aria-pressed="false">Actualizar precios</button>
         </div>
         <p id="pAnuncio" class="sr" aria-live="polite"></p>
         <div id="tVistaCat">
@@ -357,6 +358,34 @@
             <div id="gFichaCont"></div>
           </div>
           <p id="gAvisoDisco" class="nota aviso-disco"></p>
+        </div>
+
+        <!-- ACTUALIZAR PRECIOS -->
+        <div id="tVistaAdmin" hidden>
+          <dl id="aActual" class="ficha-meta"></dl>
+          <div id="aDeshabilitado" class="aviso-sec" hidden>
+            <b>Cargar tabulador está desactivado en este servidor.</b>
+            <span id="aDeshabTxt">PIANI no tiene cuentas de usuario, así que cambiar los precios solo se permite cuando quien administra el servidor define la variable de entorno <code>TABULADOR_ADMIN_KEY</code> (ver README). Mientras tanto, los precios se cambian editando <code>data/capcee/tabulador.csv</code> en el repositorio.</span>
+          </div>
+          <form id="formCarga" class="form" novalidate>
+            <label>Clave de administración
+              <input id="aClave" type="password" autocomplete="off" spellcheck="false" aria-describedby="aClaveAyuda">
+            </label>
+            <p id="aClaveAyuda" class="nota">La da quien administra el servidor. No se guarda en este navegador.</p>
+            <label>Archivo CSV del tabulador nuevo
+              <input id="aArchivo" type="file" accept=".csv,text/csv" aria-describedby="aArchivoAyuda">
+            </label>
+            <p id="aArchivoAyuda" class="nota">Máximo 1 MB, en UTF-8 (en Excel: “CSV UTF-8 (delimitado por comas)”), con las mismas columnas. Primero verás los cambios; nada se aplica hasta que lo confirmes.</p>
+            <button type="submit" id="aCargar" class="primario ancho100" aria-describedby="aDeshabTxt">Cargar tabulador</button>
+          </form>
+          <p id="aMsg" class="msg-ok" role="status" hidden></p>
+          <div id="aErrores" class="aviso-sec" role="alert" hidden></div>
+          <div id="aPrevia" hidden></div>
+
+          <h2>Versiones anteriores</h2>
+          <p id="aHistVacio" class="nota" hidden>Todavía no hay versiones anteriores. Cada vez que se aplica o restaura un tabulador, el que estaba se guarda aquí.</p>
+          <div class="tabla-pres" id="aHistCaja"><table id="aHist" class="stack"><thead><tr><th>Fecha (hora de Puebla)</th><th>Huella</th><th class="n">Conceptos</th><th><span class="sr">Restaurar</span></th></tr></thead><tbody></tbody></table></div>
+          <p id="aAvisoRender" class="nota aviso-disco"></p>
         </div>
       </div>
     </section>

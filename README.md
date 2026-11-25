@@ -41,6 +41,18 @@ Google cobra por uso con un tope mensual gratuito: pon alertas de presupuesto. E
 
 Sin internet, NEXO estima en línea recta (con factor de rodeo de 1.3 y 40 km/h) y lo indica.
 
+### Clave para cargar un tabulador nuevo (`TABULADOR_ADMIN_KEY`, opcional)
+
+PIANI no tiene cuentas de usuario, así que el botón **Cargar tabulador** (sección Tabulador → Actualizar precios) solo funciona si el servidor tiene esta variable de entorno y quien carga el archivo escribe la misma clave:
+
+```bash
+TABULADOR_ADMIN_KEY=una_clave_larga_y_dificil npm start
+```
+
+En Render, agrégala en *Environment*, igual que `GOOGLE_MAPS_API_KEY`. **Nunca la escribas en el código ni la subas al repositorio.** Sin la variable, el botón aparece desactivado y los precios se cambian editando `data/capcee/tabulador.csv` en el repositorio. Cada vez que se aplica o restaura un tabulador, el anterior se guarda en `data/capcee/historial/`.
+
+> **Aviso: Render gratuito.** El disco se borra al reiniciar: **el tabulador cargado desde la página y su historial se pierden y vuelve el CSV del repositorio.** Para conservar un tabulador nuevo, súbelo al repositorio como `data/capcee/tabulador.csv` (o usa una base de datos).
+
 ## ESP32 y LoRa
 
 - `firmware/nodo-albergue/`: ESP32 con botones +1/−1/enviar. `MODO_WIFI` manda la trama directo a NEXO (se puede simular en Wokwi); `MODO_LORA` la manda por radio a 915 MHz.

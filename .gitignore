@@ -2,3 +2,4 @@ node_modules/
 data/confirmaciones.json
 .env
 data/presupuestos.json
+data/capcee/historial/
