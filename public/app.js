@@ -449,15 +449,7 @@
     };
   }
   // "Armar presupuesto": abre el Tabulador con la obra y la CCT de la escuela (el paso 6 agrega riesgo y daño).
-  function armarPresupuestoEscuela(x) {
-    mapa.closePopup();
-    irA('tabulador');
-    verVistaTab('pres');
-    $('#pObra').value = `Rehabilitación de ${x.escuela.nombre}`.slice(0, 120);
-    $('#pCct').value = x.escuela.cct || '';
-    ['#pObra', '#pCct'].forEach((s) => $(s).dispatchEvent(new Event('input', { bubbles: true })));
-    $('#pObra').focus();
-  }
+  function armarPresupuestoEscuela(x) { presupuestoParaEscuela(x.escuela); }
   // Corregir ubicación: el cuadro se vuelve arrastrable; al soltarlo se pide confirmación y se guarda
   // en data/escuelas/correcciones.json (el CSV original no cambia). Mueve todo el inmueble.
   async function corregirUbicacion(f, x) {
@@ -1344,7 +1336,7 @@
     return `<button type="button" class="agregar${ya ? ' agregado' : ''}" data-agregar="${esc(c.clave_ref)}" aria-pressed="${ya}" aria-label="${esc(`${ya ? 'Ya está en el presupuesto' : 'Agregar al presupuesto'}: ${c.clave_ref}`)}">${ya ? 'Agregado' : 'Agregar'}</button>`;
   }
 
-  const VISTAS_TAB = { cat: ['#tVistaCat', '#tVerCat'], pres: ['#tVistaPres', '#tVerPres'], guard: ['#tVistaGuard', '#tVerGuard'], admin: ['#tVistaAdmin', '#tVerAdmin'] };
+  const VISTAS_TAB = { cat: ['#tVistaCat', '#tVerCat'], pres: ['#tVistaPres', '#tVerPres'], guard: ['#tVistaGuard', '#tVerGuard'], prio: ['#tVistaPrio', '#tVerPrio'], admin: ['#tVistaAdmin', '#tVerAdmin'] };
   function verVistaTab(cual) {
     for (const [k, [vista, boton]] of Object.entries(VISTAS_TAB)) {
       const activa = k === cual;
@@ -1352,10 +1344,12 @@
       $(boton).classList.toggle('activo', activa);
       $(boton).setAttribute('aria-pressed', String(activa));
     }
-    if (cual === 'pres') recalcular(0);
+    if (cual === 'pres') { recalcular(0); pintarEscuelaPres(); }
     if (cual === 'guard') { mostrarListaGuard(); cargarGuardados(); }
     if (cual === 'admin') cargarAdmin();
+    if (cual === 'prio') cargarPrioridades(true);
   }
+  $('#tVerPrio').addEventListener('click', () => verVistaTab('prio'));
   $('#tVerAdmin').addEventListener('click', () => verVistaTab('admin'));
   $('#tVerCat').addEventListener('click', () => verVistaTab('cat'));
   $('#tVerPres').addEventListener('click', () => verVistaTab('pres'));
@@ -1457,7 +1451,7 @@
     try {
       const r = await fetch('/api/presupuestos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ obra: $('#pObra').value, cct: $('#pCct').value, factor: $('#pFactor').value, renglones: pres.renglones.map((x) => ({ clave_ref: x.clave_ref, cantidad: x.cantidad })) }),
+        body: JSON.stringify({ obra: $('#pObra').value, cct: $('#pCct').value, factor: $('#pFactor').value, ...escenario(), renglones: pres.renglones.map((x) => ({ clave_ref: x.clave_ref, cantidad: x.cantidad })) }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -1638,6 +1632,9 @@
       ${cambios.length ? `<div class="aviso-anterior">${ETQ_ANTERIOR}<p>Este presupuesto conserva los precios del día en que se guardó. Desde entonces cambió el tabulador:</p><ul>${cambios.map((c) => `<li><code>${esc(c.clave_ref)}</code>: ${esc(c.motivo)}</li>`).join('')}</ul></div>` : ''}
       <dl class="ficha-meta">
         <div><dt>CCT</dt><dd>${p.cct ? esc(p.cct) : 'Sin CCT'}</dd></div>
+        ${p.escuela ? `<div><dt>Escuela</dt><dd>${esc(p.escuela.nombre)}</dd></div>
+        <div><dt>Riesgo al guardar</dt><dd>${etiquetaNivel(p.escuela.riesgo.nivel)} ${esc(p.escuela.fenomenoNombre)}${p.escuela.mes ? `, ${esc(MESES[p.escuela.mes - 1].toLowerCase())}` : ''}</dd></div>
+        <div><dt>Daño al guardar</dt><dd>${esc(textoDanoEsc(p.escuela.dano))}</dd></div>` : ''}
         <div><dt>Guardado</dt><dd>${esc(fechaMX(p.fecha))}</dd></div>
         <div><dt>Factor del presupuesto</dt><dd>${dos(p.factor_presupuesto)}</dd></div>
         <div><dt>Huella del tabulador</dt><dd><code title="${esc(p.tabulador.huella)}">${esc(p.tabulador.huella.slice(0, 12))}…</code></dd></div>
@@ -1924,9 +1921,172 @@
   document.addEventListener('scroll', () => requestAnimationFrame(colocarGlobo), true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ocultarGlobo(); });
 
+  // ---------- Escuelas en Tabulador y Reportes ----------
+  const NOM_NIVEL_RIESGO = (n) => NOM_NIV[n || 'sin_dato'];
+  const textoDanoEsc = (d) => (d ? `${NOM_DANO[d.dano]} (${d.verificado ? 'verificado' : 'por verificar'})` : 'sin reportes de daño');
+
+  // "Armar presupuesto" desde una escuela (mapa o lista de prioridades): obra y CCT llenas.
+  function presupuestoParaEscuela(e) {
+    mapa.closePopup();
+    irA('tabulador');
+    verVistaTab('pres');
+    $('#pObra').value = `Rehabilitación de ${e.nombre}`.slice(0, 120);
+    $('#pCct').value = e.cct || '';
+    ['#pObra', '#pCct'].forEach((s) => $(s).dispatchEvent(new Event('input', { bubbles: true })));
+    $('#pObra').focus();
+  }
+
+  // Recuadro de la escuela en "Armar presupuesto": riesgo con el escenario de la página y daño.
+  let pEscT = null;
+  let pEscPedido = 0;
+  function pintarEscuelaPres() {
+    clearTimeout(pEscT);
+    pEscT = setTimeout(async () => {
+      const caja = $('#pEscuela');
+      const cct = $('#pCct').value.trim().toUpperCase();
+      if (!/^\d{2}[A-Z]{3}\d{4}[A-Z]$/.test(cct) || !hayEscuelas()) { caja.hidden = true; return; }
+      const e = escenario();
+      const pedido = ++pEscPedido;
+      const x = await api(`/api/escuela/${encodeURIComponent(cct)}?fenomeno=${e.fenomeno}&mes=${e.mes}`).catch(() => null);
+      if (pedido !== pEscPedido) return;
+      if (!x) { caja.hidden = false; caja.innerHTML = `<p class="nota">La CCT ${esc(cct)} no está en el catálogo de escuelas: el presupuesto se guarda sin riesgo ni daño.</p>`; return; }
+      const es = x.escuela;
+      const f = { afectada: x.afectada, dano: x.dano?.dano, danoVerificado: x.dano ? x.dano.verificado : null, enPeligro: x.enPeligro, ubicacion_aproximada: es.ubicacion_aproximada, coordenada_compartida: es.coordenada_compartida };
+      caja.hidden = false;
+      caja.innerHTML = `
+        <p class="pe-titulo"><span class="${PE.claseMarcador(f)}" aria-hidden="true"></span><b>Plantel:</b> ${esc(es.nombre)} · ${esc(es.nivel || 'sin nivel')} · ${esc(es.localidad)}, ${esc(es.municipio)}</p>
+        <dl class="pe-datos">
+          <div><dt>Riesgo (${esc(textoEscenario())})</dt><dd>${etiquetaNivel(x.riesgo.nivel)} ${x.enPeligro ? 'en peligro' : ''}</dd></div>
+          <div><dt>Daño</dt><dd>${esc(textoDanoEsc(x.dano))}${x.dano?.deCct && x.dano.deCct !== es.cct ? ` · reportado en ${esc(x.dano.deCct)}` : ''}</dd></div>
+          <div><dt>Ubicación</dt><dd>${es.lat}, ${es.lon} · ${esc(es.fuente_coord || es.fuente)}${x.ubicacionDudosa ? ' (dudosa)' : ''}</dd></div>
+        </dl>
+        ${x.mismoInmueble.length ? `<p class="nota">Mismo inmueble: ${x.mismoInmueble.map((m) => esc(m.cct || m.id)).join(', ')}.</p>` : ''}
+        ${es.es_inmueble_escolar === false ? '<p class="esc-aviso">Centro CONAFE de educación inicial: puede funcionar en una casa o espacio comunitario. Revisa que el inmueble sea escolar antes de presupuestar obra.</p>' : ''}
+        <p class="nota">Al guardar, el presupuesto conserva estos datos (riesgo con este escenario y daño de hoy) y salen en su CSV.</p>`;
+    }, 250);
+  }
+  $('#pCct').addEventListener('input', pintarEscuelaPres);
+
+  // Lista "Escuelas prioritarias" (por inmueble, con sus CCT dentro).
+  const prio = { desde: 0, limite: 100, inmuebles: [], datos: null };
+  async function cargarPrioridades(desdeCero = true) {
+    if (!hayEscuelas() || !st.meta?.iter) { $('#prioLista').innerHTML = `<li class="vacio">${esc(st.meta?.escuelas?.aviso || 'No hay escuelas cargadas.')}</li>`; return; }
+    if (desdeCero) { prio.desde = 0; prio.inmuebles = []; $('#prioLista').innerHTML = '<li class="nota">Calculando prioridades…</li>'; }
+    const e = escenario();
+    const r = await api(`/api/escuelas/prioritarias?fenomeno=${e.fenomeno}&mes=${e.mes}&desde=${prio.desde}&limite=${prio.limite}${$('#prioConafe').checked ? '&conafe=1' : ''}`).catch((err) => ({ error: err.message }));
+    if (r.error) { $('#prioLista').innerHTML = `<li class="vacio">${esc(r.error)}</li>`; return; }
+    prio.datos = r;
+    prio.inmuebles = prio.inmuebles.concat(r.inmuebles);
+    $('#prioEscenario').textContent = `Escenario: ${textoEscenario()}. ${fmt(r.total)} inmuebles en la lista; ${fmt(r.conPresupuesto)} ya tienen presupuesto.${r.sinInmuebleEscolar && !$('#prioConafe').checked ? ` ${fmt(r.sinInmuebleEscolar)} centros CONAFE no se muestran.` : ''}`;
+    $('#prioKpis').innerHTML = r.grupos.map((g) => `<div><b>${fmt(r.porGrupo[g.id])}</b><small>${g.id}. ${esc(g.nombre)}</small></div>`).join('');
+    let grupoAnterior = prio.inmuebles.length - r.inmuebles.length > 0 ? prio.inmuebles[prio.inmuebles.length - r.inmuebles.length - 1].grupo : null;
+    const html = r.inmuebles.map((x) => {
+      const cab = x.grupo !== grupoAnterior ? `<li class="prio-grupo"><h3>${x.grupo}. ${esc(x.grupoNombre)}</h3></li>` : '';
+      grupoAnterior = x.grupo;
+      const cat = x.dano ? (['grave', 'inhabitable'].includes(x.dano.dano) ? 'rojo' : 'naranja') : 'amarillo';
+      const cuanto = x.alumnos !== null ? `${fmt(x.alumnos)} alumnos${x.alumnosIncompleto ? ' (mínimo)' : ''}` : `${fmt(x.pob2km)} habitantes a 2 km (sin dato de alumnos)`;
+      return `${cab}<li class="prio-item">
+        <div class="prio-top"><span class="esc-m esc-${cat}${x.dano && !x.dano.verificado ? ' esc-verificar' : ''}" aria-hidden="true"></span>
+          <span><b>${esc(x.localidad)}, ${esc(x.municipio)}</b><small>${esc(x.domicilio || 'Sin domicilio')}</small></span>
+          <span class="prio-pres ${x.tienePresupuesto ? 'si' : 'no'}">${x.tienePresupuesto ? `Con presupuesto (${x.presupuestos.length})` : 'Sin presupuesto'}</span></div>
+        <p class="nota">Riesgo ${esc(NOM_NIVEL_RIESGO(x.nivelRiesgo).toLowerCase())} · daño: ${esc(textoDanoEsc(x.dano))} · ${cuanto}</p>
+        <ul class="prio-cct">${x.escuelas.map((s) => `<li><span><code>${esc(s.cct || s.id)}</code> ${esc(s.nombre)} <small>${esc(s.nivel || '')}${s.es_inmueble_escolar === false ? ' · CONAFE' : ''}</small></span>
+          ${s.cct ? `<button type="button" class="chico" data-prio-pres="${esc(s.cct)}" data-nombre="${esc(s.nombre)}">Armar presupuesto</button>` : ''}</li>`).join('')}</ul>
+        <button type="button" class="chico enlace" data-prio-mapa="${x.lat},${x.lon}" data-id="${esc(x.escuelas[0].id)}">Ver en el mapa</button>
+      </li>`;
+    }).join('');
+    if (desdeCero) $('#prioLista').innerHTML = html || '<li class="vacio">No hay escuelas afectadas ni en peligro alto con este escenario.</li>';
+    else $('#prioLista').insertAdjacentHTML('beforeend', html);
+    $('#prioMas').hidden = prio.inmuebles.length >= r.total;
+    $('#prioMas').textContent = `Mostrar más (faltan ${fmt(r.total - prio.inmuebles.length)})`;
+  }
+  $('#prioMas').addEventListener('click', () => { prio.desde = prio.inmuebles.length; cargarPrioridades(false); });
+  $('#prioConafe').addEventListener('change', () => cargarPrioridades(true));
+  $('#prioLista').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-prio-pres]');
+    if (b) { presupuestoParaEscuela({ cct: b.dataset.prioPres, nombre: b.dataset.nombre }); return; }
+    const m = ev.target.closest('[data-prio-mapa]');
+    if (m) {
+      const [lat, lon] = m.dataset.prioMapa.split(',').map(Number);
+      irA('riesgo');
+      $('#capaEscuelas').checked = true;
+      mostrarCapas('riesgo');
+      mapa.setView([lat, lon], 16);
+      const e = escenario();
+      api(`/api/escuelas?fenomeno=${e.fenomeno}&mes=${e.mes}&estado=todas&limite=1&buscar=${encodeURIComponent(m.dataset.id)}`).then((r) => {
+        if (!r.datos.length) return;
+        const f = Object.fromEntries(r.columnas.map((c, i) => [c, r.datos[0][i]]));
+        st.esc.extra = f;
+        pintarEscuelas();
+        abrirFichaEscuela(f);
+      }).catch(() => {});
+    }
+  });
+
+  // Reportes: reportar daño en una escuela con autocompletado por CCT o nombre.
+  const re = { encontradas: [], escuela: null };
+  let reT = null;
+  function elegirEscuelaReporte(f) {
+    re.escuela = f;
+    $('#reEscuela').value = `${f.nombre} (${f.cct || f.id})`;
+    $('#reCct').value = f.cct || f.id;
+    $('#reMun').value = f.municipio;
+    $('#reLat').value = f.lat;
+    $('#reLon').value = f.lon;
+    $('#reInfo').textContent = `${f.localidad}, ${f.municipio}. Estado actual: ${f.afectada ? `afectada (${NOM_DANO[f.dano]}, ${f.danoVerificado ? 'verificado' : 'por verificar'})` : f.enPeligro ? 'en peligro' : 'sin riesgo alto'} con ${textoEscenario()}. Coordenada: ${f.fuente_coord}.`;
+    $('#reSugerencias').innerHTML = '';
+  }
+  $('#reEscuela').addEventListener('input', () => {
+    clearTimeout(reT);
+    re.escuela = null;
+    ['#reCct', '#reMun', '#reLat', '#reLon'].forEach((s) => { $(s).value = ''; });
+    $('#reInfo').textContent = '';
+    const q = $('#reEscuela').value.trim();
+    if (q.length < 3) { $('#reSugerencias').innerHTML = ''; return; }
+    reT = setTimeout(async () => {
+      const e = escenario();
+      const r = await api(`/api/escuelas?fenomeno=${e.fenomeno}&mes=${e.mes}&estado=todas&limite=8&buscar=${encodeURIComponent(q)}`).catch(() => null);
+      if (!r) { $('#reSugerencias').innerHTML = `<li class="nota">${esc(st.meta?.escuelas?.aviso || 'No se pudo buscar.')}</li>`; return; }
+      re.encontradas = r.datos.map((d) => Object.fromEntries(r.columnas.map((c, i) => [c, d[i]])));
+      $('#reSugerencias').innerHTML = re.encontradas.length
+        ? re.encontradas.map((f, i) => `<li><button type="button" data-re="${i}"><span class="${PE.claseMarcador(f)}" aria-hidden="true"></span><span><b>${esc(f.nombre)}</b><small>${esc(f.cct || f.id)} · ${esc(f.nivel || '')} · ${esc(f.localidad)}, ${esc(f.municipio)}</small></span></button></li>`).join('')
+        : '<li class="nota">Sin resultados.</li>';
+    }, 250);
+  });
+  $('#reSugerencias').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-re]');
+    if (b) { elegirEscuelaReporte(re.encontradas[Number(b.dataset.re)]); $('#formRepEsc select').focus(); }
+  });
+  $('#reFecha').max = new Date().toISOString().slice(0, 10);
+  $('#formRepEsc').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!re.escuela) { $('#reMsg').textContent = 'Elige la escuela de la lista.'; $('#reEscuela').focus(); return; }
+    const fd = new FormData(ev.target);
+    $('#reMsg').textContent = 'Guardando…';
+    try {
+      await postJSON(`/api/escuelas/${encodeURIComponent(re.escuela.id)}/reportes`, { dano: fd.get('dano'), descripcion: fd.get('descripcion'), fecha: fd.get('fecha') || undefined, origen: 'manual' });
+    } catch (err) { $('#reMsg').textContent = err.message; return; }
+    $('#reMsg').textContent = `Guardado: ${re.escuela.nombre} queda por verificar.`;
+    ev.target.reset();
+    $('#reEscuela').value = '';
+    re.escuela = null;
+    ['#reCct', '#reMun', '#reLat', '#reLon'].forEach((s) => { $(s).value = ''; });
+    $('#reInfo').textContent = '';
+    await cargarConfirmaciones();
+    pintarReportes();
+    cargarEscuelas();
+  });
+  // El CSV de reportes usa el escenario de la página para el nivel de riesgo.
+  $('#repCsvEsc').addEventListener('click', () => {
+    const e = escenario();
+    $('#repCsvEsc').href = `/api/escuelas/reportes.csv?fenomeno=${encodeURIComponent(e.fenomeno)}&mes=${e.mes}`;
+  });
+
   // ---------- Escenario ----------
   async function recargarEscenario() {
     notaMes();
+    pintarEscuelaPres();
+    if (st.sec === 'tabulador' && !$('#tVistaPrio').hidden) cargarPrioridades(true);
     mapa.closePopup();
     cargarEscuelas(); // en paralelo con las localidades: el mapa y sus cifras cambian juntos
     await cargarLocalidades();
@@ -1962,6 +2122,11 @@
       if ([qs.get('lat'), qs.get('lon')].every((v) => v !== null && Number.isFinite(Number(v)))) mapa.setView([Number(qs.get('lat')), Number(qs.get('lon'))], Math.min(18, Math.max(6, Number(qs.get('z')) || 12)));
       await cargarEscuelas();
       pintarLeyenda();
+      // Vista del Tabulador desde la dirección (#tabulador?vista=prio, o ?vista=pres&cct=21DPR1273G).
+      if (st.sec === 'tabulador' && VISTAS_TAB[qs.get('vista')]) {
+        verVistaTab(qs.get('vista'));
+        if (qs.get('vista') === 'pres' && qs.get('cct')) { $('#pCct').value = qs.get('cct'); pintarEscuelaPres(); }
+      }
       // Ficha de una escuela desde la dirección (?escuela=21DPR1273G).
       if (qs.get('escuela') && hayEscuelas()) {
         const e = escenario();

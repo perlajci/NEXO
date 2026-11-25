@@ -14,7 +14,7 @@ NEXO parte del censo del INEGI: antes de que llegue el primer reporte ya sabe **
 | **Municipios** | Tablero estatal: indicadores, ranking ordenable (riesgo, % en riesgo alto, población, vulnerabilidad, 60+, 0–2, discapacidad), buscador y **ficha de cada municipio** con sismos y clima |
 | **Albergues sugeridos** | Modelo de cobertura máxima: sedes **fuera de la zona de peligro** que alcanzan a más personas en riesgo, ponderadas por vulnerabilidad; capacidad sugerida; localidades sin cubrir; registrar la propuesta como albergue |
 | **Operación** | Registro de albergues, **bases de respuesta** (Protección Civil, Cruz Roja, hospitales) y reportes; expuestos vs. confirmados vs. sin confirmar |
-| **Tabulador** | Precios de referencia para obra escolar (CAPCEE): catálogo con tipo de dato y fuente, **presupuestos por partida** con IVA aparte, presupuestos guardados con copia fija de precios, exportación a CSV y carga de tabulador nuevo con historial. Ver [Tabulador de obra escolar](#tabulador-de-obra-escolar-capcee) |
+| **Tabulador** | Precios de referencia para obra escolar (CAPCEE): catálogo con tipo de dato y fuente, **presupuestos por partida** con IVA aparte, presupuestos guardados con copia fija de precios, exportación a CSV y carga de tabulador nuevo con historial. **Escuelas prioritarias** por inmueble y presupuesto armado desde una escuela, con su riesgo y su daño. Ver [Tabulador de obra escolar](#tabulador-de-obra-escolar-capcee) y [Escuelas en Tabulador y Reportes](#escuelas-en-tabulador-y-reportes) |
 | **Rutas** | Emergencia ← base más cercana, o emergencia → albergue más cercano; distancia y tiempo; enlace para abrir en Google Maps desde el celular |
 | **Sismos** | Historial, valor b de Gutenberg-Richter y periodo de retorno de un M≥6 en el punto elegido |
 | **Clima** | Pronóstico de 7 días y lluvia y heladas promedio por mes |
@@ -230,6 +230,15 @@ Capa **Escuelas (cuadros)** en Mapa de riesgo, encima de las localidades (círcu
 - Al cambiar fenómeno o mes, la capa se vuelve a pedir junto con las localidades.
 - **Enlaces:** `?fenomeno=sismico&mes=11` elige el escenario, `?lat=&lon=&z=` la vista y `?escuela=21DPR1273G` abre la ficha (por ejemplo `/?fenomeno=volcanico&mes=11&escuela=21DPR1273G#riesgo`).
 
+### Escuelas en Tabulador y Reportes
+
+- **Reportes → Reportar daño en una escuela:** el campo de escuela autocompleta por CCT o nombre y llena la CCT, el municipio y las coordenadas del catálogo. El reporte queda por verificar. Hay un filtro **Escuelas** en la lista y el botón **Exportar reportes de escuelas (CSV)**.
+- **Tabulador → Armar presupuesto:** con la CCT de una escuela del catálogo (escrita a mano, desde la ficha del mapa o desde la lista de prioridades) aparece un recuadro con el plantel, su riesgo con el escenario de la página, su daño y su ubicación. El plantel del presupuesto sale del catálogo de escuelas cuando no existe `data/capcee/planteles.csv`.
+- **Al guardar,** el presupuesto conserva una **foto de la escuela** (`escuela`): CCT, coordenadas, fuente de la coordenada, nivel de riesgo, fenómeno y mes usados, daño y origen del reporte. El riesgo y el daño cambian con el tiempo; la foto dice con qué datos se armó.
+- **Tabulador → Escuelas prioritarias** (`lib/prioridades-escuelas.js`): una fila por **inmueble**, con sus CCT dentro, en este orden: 1) afectadas con daño grave o inhabitable, 2) afectadas con daño leve o moderado, 3) en peligro muy alto, 4) en peligro alto. Dentro de cada grupo, primero los inmuebles con dato de alumnos, de más a menos; después los que no lo tienen, de más a menos población del censo a 2 km. Cada fila dice si ya tiene presupuesto (en cualquiera de sus CCT). Los centros CONAFE de educación inicial no salen salvo que se marque la casilla.
+- **CSV del presupuesto:** después del encabezado, un bloque “Datos de la escuela” con escuela, latitud, longitud, fuente de la coordenada, nivel de riesgo, fenómeno y mes usados, estado de daño y origen del reporte. Si la CCT no está en el catálogo, lo dice.
+- **CSV de reportes** (`/api/escuelas/reportes.csv`): un renglón por reporte con fecha del daño, CCT, escuela, municipio, localidad, latitud, longitud, fuente de la coordenada, daño, estado y origen del reporte, estado de daño de la escuela, nivel de riesgo, fenómeno y mes usados, inmueble y descripción.
+
 ### Reportes de daño (`lib/reportes-escuelas.js`)
 
 Se guardan en `data/confirmaciones.json`, la misma capa que Operación, con tipo `escuela`. Cada reporte lleva: `cct`, `dano` (`sin_dano`, `leve`, `moderado`, `grave`, `inhabitable`), `descripcion`, `fecha_dano`, `origen` (`manual` desde la página, o `espnow`, `lora` o `wifi` desde un nodo ESP32), `estado` (`pendiente` o `verificado`) e `historial` (alta y cada cambio de estado).
@@ -251,7 +260,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 106 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`, 8 de reportes de daño en `test/escuelas-reportes.test.js` y 9 del mapa de escuelas en `test/escuelas-mapa.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 113 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`, 8 de reportes de daño en `test/escuelas-reportes.test.js`, 9 del mapa de escuelas en `test/escuelas-mapa.test.js` y 7 de escuelas en Tabulador y Reportes en `test/escuelas-tabulador.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
@@ -285,12 +294,15 @@ Pruebas del tabulador (40):
 | GET | `/api/escuela/:cct?fenomeno=&mes=` | Ficha: datos, localidad del censo más cercana y su distancia, avisos (vulnerabilidad referencial, coordenada aproximada o compartida, daño por verificar), CCT del mismo inmueble, riesgo con los cuatro fenómenos, población en 2 km, albergue más cercano, daño, reportes e historial (también acepta `DENUE-<id>`) |
 | GET/POST | `/api/escuelas/:cct/reportes` | Reportes que aplican a la escuela (los de todo su inmueble) y su daño; alta `{dano, descripcion, fecha, origen, estado}` (400 si el daño o la fecha no son válidos) |
 | PATCH | `/api/escuelas/:cct/reportes/:id` | `{estado: "verificado" \| "pendiente", nota}`; queda en el historial |
+| GET | `/api/escuelas/prioritarias?fenomeno=&mes=&conafe=1&desde=&limite=` | Escuelas prioritarias por inmueble (grupos 1 a 4, conteo por grupo, si tienen presupuesto); `limite` hasta 1000 |
+| GET | `/api/escuelas/reportes.csv?fenomeno=&mes=` | Reportes de daño en escuelas para Excel, con el riesgo del escenario |
 | POST/DELETE | `/api/escuelas/:cct/ubicacion` | Corrige la ubicación `{lat, lon, nota}` de todo el inmueble (dentro de Puebla y a 20 km o menos de la original; 400 si no) o la deshace |
 | POST | `/api/lora/trama` | Trama de un nodo ESP32 |
 | GET/POST/DELETE | `/api/confirmaciones` | Albergues, bases y reportes |
 | GET | `/api/tabulador?buscar=&capitulo=&tipo=` | Conceptos del tabulador filtrados (409 con aviso si falta el CSV) |
 | GET | `/api/tabulador/resumen` | Conceptos por capítulo y por tipo de dato |
 | POST | `/api/presupuesto/calcular` | `{obra, cct, factor, renglones:[{clave_ref, cantidad}]}`; calcula sin guardar (400 con la lista de errores) |
+| | | Al guardar (`POST /api/presupuestos`) se puede mandar `fenomeno` y `mes`: con ellos se guarda la foto de la escuela de esa CCT |
 | GET/POST | `/api/presupuestos` | Lista (`?recursos=1`: marcados para Recursos CAPCEE) y guardar; el servidor recalcula |
 | GET/DELETE | `/api/presupuestos/:id` | Presupuesto guardado (con comparación contra el tabulador actual) y borrar |
 | GET | `/api/presupuestos/:id/csv` | Exportación para Excel |

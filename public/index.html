@@ -241,7 +241,37 @@
         <button type="button" data-rep-filtro="lora">Red ESP32</button>
         <button type="button" data-rep-filtro="reporte">Emergencias</button>
         <button type="button" data-rep-filtro="albergue">Albergues</button>
+        <button type="button" data-rep-filtro="escuela">Escuelas</button>
       </div>
+      <details class="caja" id="repEscCaja">
+        <summary>Reportar daño en una escuela</summary>
+        <form id="formRepEsc" class="form" novalidate>
+          <label>Escuela (CCT o nombre)
+            <input id="reEscuela" type="search" autocomplete="off" spellcheck="false" placeholder="21DPR1273G o Benito Juárez" aria-controls="reSugerencias" aria-describedby="reAyuda">
+          </label>
+          <p id="reAyuda" class="nota">Escribe al menos 3 letras y elige la escuela de la lista: se llenan la CCT, el municipio y las coordenadas del catálogo.</p>
+          <ul id="reSugerencias" class="esc-resultados" aria-label="Escuelas encontradas"></ul>
+          <div class="fila">
+            <label>CCT <input id="reCct" readonly></label>
+            <label>Municipio <input id="reMun" readonly></label>
+          </div>
+          <div class="fila">
+            <label>Latitud <input id="reLat" readonly></label>
+            <label>Longitud <input id="reLon" readonly></label>
+          </div>
+          <p id="reInfo" class="nota"></p>
+          <div class="fila">
+            <label>Daño <select name="dano">
+              <option value="sin_dano">Sin daño</option><option value="leve" selected>Leve</option><option value="moderado">Moderado</option><option value="grave">Grave</option><option value="inhabitable">Inhabitable</option>
+            </select></label>
+            <label>Fecha del daño <input name="fecha" type="date" id="reFecha"></label>
+          </div>
+          <label>Descripción <textarea name="descripcion" rows="2" maxlength="500" placeholder="Qué se ve dañado"></textarea></label>
+          <p class="nota">El reporte queda <b>por verificar</b> hasta que alguien lo confirme en campo, y se aplica a todas las CCT del mismo inmueble.</p>
+          <div class="fila"><button type="submit" class="primario">Guardar reporte</button><span id="reMsg" class="nota" role="status"></span></div>
+        </form>
+      </details>
+      <p><a class="boton" id="repCsvEsc" href="/api/escuelas/reportes.csv" download>Exportar reportes de escuelas (CSV)</a></p>
       <div id="listaReportes" class="rep-lista"></div>
     </section>
 
@@ -295,6 +325,7 @@
           <button type="button" id="tVerCat" class="activo" aria-pressed="true">Catálogo</button>
           <button type="button" id="tVerPres" aria-pressed="false">Armar presupuesto <span id="tNumPres" class="num-pres">0</span></button>
           <button type="button" id="tVerGuard" aria-pressed="false">Guardados <span id="tNumGuard" class="num-pres">0</span></button>
+          <button type="button" id="tVerPrio" aria-pressed="false">Escuelas prioritarias</button>
           <button type="button" id="tVerAdmin" aria-pressed="false">Actualizar precios</button>
         </div>
         <p id="pAnuncio" class="sr" aria-live="polite"></p>
@@ -342,6 +373,7 @@
               </label>
             </div>
             <p id="pCctMsg" class="campo-msg"></p>
+            <div id="pEscuela" class="pres-escuela" hidden aria-live="polite"></div>
             <p id="pFactorAyuda" class="nota">El factor ajusta a Puebla precios tomados de otro estado. Se multiplica por el factor de cada concepto del tabulador; no se aplica a los conceptos en %.</p>
           </form>
 
@@ -390,6 +422,16 @@
         </div>
 
         <!-- ACTUALIZAR PRECIOS -->
+        <!-- ESCUELAS PRIORITARIAS -->
+        <div id="tVistaPrio" hidden>
+          <p class="nota" id="prioNota">Inmuebles escolares ordenados para planear obra: 1) afectados con daño grave o inhabitable, 2) afectados con daño leve o moderado, 3) en peligro muy alto, 4) en peligro alto. Dentro de cada grupo, primero los que tienen más alumnos (o, si no hay dato, más población a 2 km).</p>
+          <p class="nota" id="prioEscenario" aria-live="polite"></p>
+          <div class="checks"><label><input type="checkbox" id="prioConafe">Incluir centros CONAFE de educación inicial (pueden funcionar en casas o espacios comunitarios)</label></div>
+          <div id="prioKpis" class="kpis k3"></div>
+          <ol id="prioLista" class="prio-lista"></ol>
+          <button type="button" id="prioMas" hidden>Mostrar más</button>
+        </div>
+
         <div id="tVistaAdmin" hidden>
           <dl id="aActual" class="ficha-meta"></dl>
           <div id="aDeshabilitado" class="aviso-sec" hidden>

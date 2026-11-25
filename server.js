@@ -22,6 +22,7 @@ import { crearAlmacenJSON } from './lib/almacen.js';
 import {
   cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA, NIVELES_ESCOLARES, aplicarCorrecciones, validarCorreccion, ubicacionDudosa,
 } from './lib/escuelas.js';
+import { priorizarInmuebles, contextoEscuela, filasEscuelaCSV, reportesACSV } from './lib/prioridades-escuelas.js';
 import { prepararEscuelas, riesgoEscuela, riesgoPorFenomeno, enPeligro, filtrarEscuelas, resumenEscuelas } from './lib/riesgo-escuelas.js';
 import {
   crearReporteEscuela, cambiarEstadoReporte, reportesDeEscuela, danoPorEscuela, normalizarDano, ErrorReporte, DANOS, NOMBRE_DANO, ORIGENES,
@@ -256,6 +257,29 @@ function filasEscuelas(fenomeno, mes) {
     }));
   }
   return escFilas.get(k);
+}
+// Planteles para enlazar un presupuesto con su escuela: data/capcee/planteles.csv si existe; si no,
+// el catálogo de escuelas (data/escuelas/). Se arma una vez por versión del catálogo.
+let plantelesCache = { de: null, mapa: null };
+function planteles() {
+  const deArchivo = cargarPlanteles(ARCHIVO_PLANTELES);
+  if (deArchivo) return deArchivo;
+  const d = escuelas();
+  if (!d) return null;
+  if (plantelesCache.de !== d) {
+    const mapa = new Map();
+    for (const e of d.escuelas) {
+      if (e.cct && !mapa.has(e.cct)) mapa.set(e.cct, { cct: e.cct, nombre: e.nombre, nivel: e.nivel, municipio: e.municipio, localidad: e.localidad, lat: e.lat, lon: e.lon, inmueble_id: e.inmueble_id });
+    }
+    plantelesCache = { de: d, mapa };
+  }
+  return plantelesCache.mapa;
+}
+// Foto de la escuela (ubicación, riesgo y daño) para guardar con un presupuesto; null si la CCT no está.
+function contextoPorCct(cct, fenomeno, mes) {
+  if (!cct || !estado.iter || !escuelas()?.escuelas.length) return null;
+  const f = filasEscuelas(fenomeno, mes)?.find((x) => x.e.cct === cct);
+  return f ? contextoEscuela(f, fenomeno, mes) : null;
 }
 const requiereCatalogoEscuelas = (res) => {
   if (escuelas()?.escuelas.length) return false;
@@ -741,7 +765,7 @@ async function api(req, res, url) {
     if (requiereTabulador(res)) return;
     const b = await leerCuerpo(req);
     try {
-      return enviar(res, 200, calcularPresupuesto(b, tabulador().conceptos, cargarPlanteles(ARCHIVO_PLANTELES)));
+      return enviar(res, 200, calcularPresupuesto(b, tabulador().conceptos, planteles()));
     } catch (e) {
       if (e instanceof ErrorPresupuesto) return enviar(res, 400, { error: e.message, errores: e.errores });
       throw e;
@@ -768,11 +792,16 @@ async function api(req, res, url) {
       renglones: Array.isArray(b.renglones) ? b.renglones.map((r) => ({ clave_ref: r?.clave_ref, cantidad: r?.cantidad })) : [],
     };
     let calculo;
-    try { calculo = calcularPresupuesto(entrada, t.conceptos, cargarPlanteles(ARCHIVO_PLANTELES)); } catch (e) {
+    try { calculo = calcularPresupuesto(entrada, t.conceptos, planteles()); } catch (e) {
       if (e instanceof ErrorPresupuesto) return enviar(res, 400, { error: e.message, errores: e.errores });
       throw e;
     }
-    return enviar(res, 201, presupuestos.guardar(armarGuardado(calculo, t)));
+    // Con la CCT de una escuela del catálogo se guarda su foto (ubicación, riesgo con el escenario de la
+    // página y daño), para que el CSV diga con qué datos se armó el presupuesto.
+    const fen = FENOMENOS[b.fenomeno] ? b.fenomeno : fenomeno;
+    const m = Math.min(12, Math.max(1, Math.round(num(b.mes, mes))));
+    const escuela = contextoPorCct(calculo.cct, fen, m);
+    return enviar(res, 201, presupuestos.guardar({ ...armarGuardado(calculo, t), escuela }));
   }
   const mp = ruta.match(/^\/api\/presupuestos\/([\w-]{1,64})(\/csv|\/recursos)?$/);
   if (mp) {
@@ -790,7 +819,7 @@ async function api(req, res, url) {
         'Content-Disposition': `attachment; filename="${nombreArchivoCSV(p)}"`,
         'Cache-Control': 'no-store',
       });
-      return res.end(presupuestoACSV(p));
+      return res.end(presupuestoACSV(p, p.cct ? filasEscuelaCSV(p.escuela) : []));
     }
     // Deja el presupuesto disponible para el futuro módulo Recursos CAPCEE (ver paraRecursosCapcee).
     if (extra === '/recursos' && req.method === 'POST') {
@@ -801,6 +830,27 @@ async function api(req, res, url) {
   }
 
   // ---------- Escuelas ----------
+  // Escuelas prioritarias para el Tabulador, por inmueble: afectadas graves, afectadas leves, en peligro
+  // muy alto y en peligro alto; dentro de cada grupo, más alumnos (o población a 2 km) primero.
+  if (ruta === '/api/escuelas/prioritarias' && req.method === 'GET') {
+    if (requiereEscuelas(res)) return;
+    const r = priorizarInmuebles(filasEscuelas(fenomeno, mes), presupuestos.listar(), { conafe: q.get('conafe') === '1' });
+    const desde = Math.max(0, Math.round(num(q.get('desde'), 0)));
+    const limite = Math.min(1000, Math.max(1, Math.round(num(q.get('limite'), 100))));
+    return enviar(res, 200, { fenomeno, mes, ...r, desde, limite, inmuebles: r.inmuebles.slice(desde, desde + limite) });
+  }
+  // Reportes de daño en escuelas para Excel, con el riesgo del escenario elegido.
+  if (ruta === '/api/escuelas/reportes.csv' && req.method === 'GET') {
+    if (requiereEscuelas(res)) return;
+    const porId = new Map(filasEscuelas(fenomeno, mes).map((f) => [f.e.id, f]));
+    const items = reportesEscuela().sort((a, b) => b.fecha_dano.localeCompare(a.fecha_dano)).map((r) => ({ reporte: r, fila: porId.get(r.escuela_id) || null }));
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="reportes_escuelas_${fenomeno}_${new Date().toISOString().slice(0, 10)}.csv"`,
+      'Cache-Control': 'no-store',
+    });
+    return res.end(reportesACSV(items, { fenomeno, mes }));
+  }
   if (ruta === '/api/escuelas' && req.method === 'GET') {
     if (requiereEscuelas(res)) return;
     const estadoQ = ['peligro', 'afectada', 'todas', 'peligro_afectada'].includes(q.get('estado')) ? q.get('estado') : 'todas';
