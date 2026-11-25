@@ -116,7 +116,7 @@ void setup() {
   esp_wifi_get_channel(&chReal, &ch2);
 
   Serial.println();
-  Serial.println("=== NEXO · ESP32 #2 (Receptor ESP-NOW -> USB) ===");
+  Serial.println("=== PIANI · ESP32 #2 (Receptor ESP-NOW -> USB) ===");
   Serial.print("Canal real:   "); Serial.println(chReal);
   Serial.print("MAC Receptor: "); Serial.println(WiFi.macAddress());
 
