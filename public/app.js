@@ -290,6 +290,7 @@
   const hayEscuelas = () => !!st.meta?.escuelas?.cargadas;
 
   async function cargarEscuelas() {
+    pintarTarjetaEscuelas(); // la tarjeta de Inicio cambia junto con el mapa
     if (!hayEscuelas() || !st.meta?.iter) {
       capas.esc.clearLayers();
       $('#escEstado').textContent = st.meta?.escuelas?.aviso || 'No hay escuelas cargadas.';
@@ -490,12 +491,57 @@
     });
   }
 
+  // Tarjeta "Escuelas" de Inicio: en peligro, afectadas y alumnos expuestos con el escenario elegido.
+  let tarjetaPedido = 0;
+  function textoEscenario() {
+    const fen = st.meta?.fenomenos?.[$('#fFenomeno').value];
+    const mes = MESES[Number($('#fMes').value) - 1];
+    return `${fen?.nombre || 'el escenario elegido'}${fen?.estacional && mes ? `, ${mes.toLowerCase()}` : ''}`;
+  }
+  async function pintarTarjetaEscuelas() {
+    const caja = $('#iEscuelas');
+    if (!hayEscuelas() || !st.meta?.iter) {
+      caja.disabled = true;
+      ['#iEscPeligro', '#iEscAfect', '#iEscAlumnos'].forEach((s2) => { $(s2).textContent = '–'; });
+      $('#iEscNota').textContent = st.meta?.escuelas?.aviso || 'No hay escuelas cargadas.';
+      return;
+    }
+    const e = escenario();
+    const pedido = ++tarjetaPedido;
+    const r = await api(`/api/escuelas/resumen?fenomeno=${encodeURIComponent(e.fenomeno)}&mes=${e.mes}`).catch(() => null);
+    if (pedido !== tarjetaPedido) return; // llegó la respuesta de un escenario anterior
+    if (!r) { $('#iEscNota').textContent = 'No se pudo calcular el resumen de escuelas.'; return; }
+    const t = PE.tarjeta(r, textoEscenario());
+    $('#iEscPeligro').textContent = t.peligro;
+    $('#iEscPeligroDet').textContent = t.peligroDetalle;
+    $('#iEscAfect').textContent = t.afectadas;
+    $('#iEscAfectDet').textContent = t.afectadasDetalle;
+    $('#iEscAlumnos').textContent = t.alumnos;
+    $('#iEscAlumnos').classList.toggle('te-sin', r.alumnosExpuestos === null);
+    $('#iEscNota').textContent = t.nota;
+    caja.setAttribute('aria-label', t.etiqueta);
+    caja.disabled = false;
+  }
+  // Clic en la tarjeta: Mapa de riesgo con solo las escuelas en peligro o afectadas, encuadradas.
+  $('#iEscuelas').addEventListener('click', async () => {
+    marcarFiltroEsc('peligro_afectada');
+    $('#capaEscuelas').checked = true;
+    irA('riesgo');
+    await cargarEscuelas();
+    if (!st.esc.filas.length) return;
+    const b = L.latLngBounds(st.esc.filas.map((f) => [f.lat, f.lon]));
+    mapa.fitBounds(b.pad(0.08), { maxZoom: 13 });
+  });
+
   // Filtro rápido y buscador
+  function marcarFiltroEsc(filtro) {
+    st.esc.filtro = filtro;
+    $$('#escFiltro button').forEach((x) => { const a = x.dataset.escFiltro === filtro; x.classList.toggle('activo', a); x.setAttribute('aria-pressed', String(a)); });
+  }
   $('#escFiltro').addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-esc-filtro]');
     if (!b) return;
-    st.esc.filtro = b.dataset.escFiltro;
-    $$('#escFiltro button').forEach((x) => { const a = x === b; x.classList.toggle('activo', a); x.setAttribute('aria-pressed', String(a)); });
+    marcarFiltroEsc(b.dataset.escFiltro);
     cargarEscuelas();
   });
   let buscarEscT = null;

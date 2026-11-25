@@ -65,6 +65,20 @@ test('mapa: 5 700 escuelas se agrupan rápido', () => {
   assert.ok(ms < 200, `tardó ${ms.toFixed(1)} ms`);
 });
 
+// ---------- Tarjeta de Inicio ----------
+test('tarjeta de Inicio: en peligro, afectadas y alumnos (sin inventar alumnos)', () => {
+  const r = {
+    enPeligro: 5677, inmueblesEnPeligro: 4183, afectadas: 3, inmueblesAfectados: 1, afectadasPorVerificar: 2,
+    alumnosExpuestos: null, avisoAlumnos: 'El catálogo de escuelas no trae número de alumnos, así que no se pueden contar alumnos expuestos.',
+  };
+  const t = PE.tarjeta(r, 'Sísmico');
+  assert.deepEqual([t.peligro, t.peligroDetalle, t.afectadas, t.afectadasDetalle, t.alumnos], ['5,677', 'en 4,183 inmuebles', '3', 'en 1 inmueble · 2 por verificar', 'Sin dato']);
+  assert.match(t.nota, /^En peligro: estimación del modelo con Sísmico\. Afectadas: reportes de campo\. El catálogo de escuelas no trae/);
+  assert.equal(t.etiqueta, 'Escuelas con Sísmico: 5,677 en peligro, 3 afectadas. Ver en el mapa.');
+  const sinNada = PE.tarjeta({ ...r, enPeligro: 0, inmueblesEnPeligro: 0, afectadas: 0, inmueblesAfectados: 0, afectadasPorVerificar: 0, alumnosExpuestos: 0, avisoAlumnos: null }, 'Heladas, enero');
+  assert.deepEqual([sinNada.peligroDetalle, sinNada.afectadasDetalle, sinNada.alumnos], ['', 'sin reportes de daño', '0'], 'con dato de alumnos, 0 sí se muestra');
+});
+
 // ---------- Vialidades ----------
 test('inmueble: las abreviaturas de vialidad se escriben completas antes de comparar', () => {
   const id = (d) => inmuebleId(19, -98, d);

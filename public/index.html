@@ -60,6 +60,16 @@
         </dl>
       </div>
 
+      <button type="button" class="tarjeta-esc" id="iEscuelas" aria-describedby="iEscNota" disabled>
+        <span class="te-titulo"><i class="esc-m esc-amarillo" aria-hidden="true"></i>Escuelas <span class="te-ir">Ver en el mapa <span aria-hidden="true">→</span></span></span>
+        <span class="te-datos" aria-live="polite">
+          <span><b id="iEscPeligro">–</b><small>en peligro</small><small id="iEscPeligroDet" class="te-det"></small></span>
+          <span><b id="iEscAfect">–</b><small>afectadas</small><small id="iEscAfectDet" class="te-det"></small></span>
+          <span><b id="iEscAlumnos">–</b><small>alumnos expuestos</small></span>
+        </span>
+        <small id="iEscNota" class="te-nota">Cargando escuelas…</small>
+      </button>
+
       <nav class="mosaico" aria-label="Herramientas principales">
         <button type="button" data-ir="riesgo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>Mapa de riesgo</button>
         <button type="button" data-ir="contar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="10" r="2.5"/><path d="M8 16c1-2 7-2 8 0"/></svg>Contar población</button>

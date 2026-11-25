@@ -115,6 +115,8 @@ test('API reportes: alta, por verificar, mismo inmueble, verificación e histori
   assert.equal(alta.s, 201);
   assert.deepEqual([alta.j.estado, alta.j.origen], ['pendiente', 'manual']);
 
+  const pend = (await pedir('/api/escuelas/resumen?fenomeno=volcanico&mes=11')).j;
+  assert.deepEqual([pend.afectadas, pend.afectadasPorVerificar], [2, 2], 'para la tarjeta de Inicio');
   let lista = filasDe((await pedir('/api/escuelas?fenomeno=volcanico&mes=11&estado=afectada')).j);
   assert.deepEqual(lista.map((f) => [f.cct, f.dano, f.danoVerificado, f.danoDeCct]), [
     ['21ZZZ0201A', 'grave', false, '21ZZZ0201A'],
@@ -141,7 +143,7 @@ test('API reportes: alta, por verificar, mismo inmueble, verificación e histori
   assert.ok(ficha.avisos.some((a) => /Otras 1 CCT con otro domicilio/.test(a)));
 
   const r = (await pedir('/api/escuelas/resumen?fenomeno=volcanico&mes=11')).j;
-  assert.deepEqual([r.afectadas, r.inmueblesAfectados, r.total, r.inmuebles], [2, 1, 4, 3]);
+  assert.deepEqual([r.afectadas, r.inmueblesAfectados, r.total, r.inmuebles, r.afectadasPorVerificar], [2, 1, 4, 3, 0]);
   assert.match(r.texto, /2 afectadas en 1 inmuebles/);
   assert.equal(filasDe((await pedir('/api/escuelas?estado=afectada')).j).some((f) => f.cct === '21ZZZ0203C'), false);
 });

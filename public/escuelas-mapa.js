@@ -73,6 +73,27 @@
     return `${g.n} escuelas: ${partes.join(', ')}${g.porVerificar ? ` (${g.porVerificar} por verificar)` : ''}`;
   }
 
-  const api = { ZOOM_INDIVIDUAL, CELDA_PX, UMBRAL_COORD_COMPARTIDA, ORDEN, ETIQUETA, categoria, porVerificar, dudosa, claseMarcador, agrupar, tamGrupo, textoGrupo };
+  // Textos de la tarjeta "Escuelas" de Inicio a partir de /api/escuelas/resumen.
+  // escenario: texto como "Volcánico (Popocatépetl)" o "Lluvias intensas, julio".
+  const num = (n) => Number(n).toLocaleString('es-MX');
+  const plural = (n, uno, varios) => `${num(n)} ${n === 1 ? uno : varios}`;
+  function tarjeta(r, escenario) {
+    return {
+      peligro: num(r.enPeligro),
+      peligroDetalle: r.enPeligro ? `en ${plural(r.inmueblesEnPeligro, 'inmueble', 'inmuebles')}` : '',
+      afectadas: num(r.afectadas),
+      afectadasDetalle: r.afectadas
+        ? `en ${plural(r.inmueblesAfectados, 'inmueble', 'inmuebles')}${r.afectadasPorVerificar ? ` · ${num(r.afectadasPorVerificar)} por verificar` : ''}`
+        : 'sin reportes de daño',
+      alumnos: r.alumnosExpuestos === null || r.alumnosExpuestos === undefined ? 'Sin dato' : num(r.alumnosExpuestos),
+      nota: [
+        `En peligro: estimación del modelo con ${escenario}. Afectadas: reportes de campo.`,
+        r.avisoAlumnos || '',
+      ].filter(Boolean).join(' '),
+      etiqueta: `Escuelas con ${escenario}: ${num(r.enPeligro)} en peligro, ${num(r.afectadas)} afectadas. Ver en el mapa.`,
+    };
+  }
+
+  const api = { ZOOM_INDIVIDUAL, CELDA_PX, UMBRAL_COORD_COMPARTIDA, ORDEN, ETIQUETA, categoria, porVerificar, dudosa, claseMarcador, agrupar, tamGrupo, textoGrupo, tarjeta };
   raiz.PianiEscuelas = api;
 })(typeof window !== 'undefined' ? window : globalThis);

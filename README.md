@@ -8,7 +8,7 @@ NEXO parte del censo del INEGI: antes de que llegue el primer reporte ya sabe **
 
 | Sección | Qué hace |
 |---|---|
-| **Inicio** | Qué se puede hacer, estado de los datos y primeros pasos |
+| **Inicio** | Qué se puede hacer, estado de los datos y primeros pasos; tarjeta **Escuelas** con las escuelas en peligro, afectadas (y por verificar) y alumnos expuestos con el escenario elegido; al darle clic abre el mapa con esas escuelas |
 | **Mapa de riesgo** | Localidades en semáforo según fenómeno y mes; población estatal por nivel; filtros por municipio, nivel y tamaño; capas; **escuelas** en peligro y afectadas, con ficha, reporte de daño, presupuesto, ruta y corrección de ubicación. Ver [Escuelas en el mapa](#escuelas-en-el-mapa) |
 | **Contar población** | Círculo, polígono o zonas rápidas (Popocatépetl 12/30 km, ceniza según viento, todo el estado): población, grupos vulnerables, viviendas, localidades prioritarias, CSV |
 | **Municipios** | Tablero estatal: indicadores, ranking ordenable (riesgo, % en riesgo alto, población, vulnerabilidad, 60+, 0–2, discapacidad), buscador y **ficha de cada municipio** con sismos y clima |
@@ -251,7 +251,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 105 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`, 8 de reportes de daño en `test/escuelas-reportes.test.js` y 8 del mapa de escuelas en `test/escuelas-mapa.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 106 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`, 8 de reportes de daño en `test/escuelas-reportes.test.js` y 9 del mapa de escuelas en `test/escuelas-mapa.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
