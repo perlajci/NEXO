@@ -46,8 +46,10 @@
     inicio: ['loc', 'popo', 'conf'], riesgo: ['loc', 'popo', 'conf'], contar: ['loc', 'geo', 'vert', 'conf'],
     municipios: ['mun', 'geo'], albergues: ['loc', 'alb'], reportes: ['conf'], operacion: ['loc', 'geo', 'conf'],
     rutas: ['conf', 'ruta'], sismos: ['sis', 'punto', 'geo'], clima: ['punto', 'geo'], ayuda: ['loc'],
+    tabulador: [],
   };
   function pintarLeyenda() {
+    $('#leyenda').hidden = st.sec === 'tabulador'; // el tabulador no pinta nada en el mapa
     if (st.sec === 'reportes' && !st.repConRiesgo) {
       $('#leyenda').innerHTML = Object.entries(NOM_TIPO).map(([k, v]) => `<span><i style="background:${COLOR_TIPO[k]}"></i>${v}</span>`).join('');
     } else {
@@ -69,13 +71,13 @@
   const pista = (txt) => { $('#pista').hidden = !txt; $('#pista').textContent = txt || ''; };
 
   // ---------- Navegación ----------
-  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'reportes', 'operacion', 'rutas', 'sismos', 'clima', 'ayuda'];
+  const SECCIONES = ['inicio', 'riesgo', 'contar', 'municipios', 'albergues', 'reportes', 'operacion', 'tabulador', 'rutas', 'sismos', 'clima', 'ayuda'];
   function irA(sec) {
     if (!SECCIONES.includes(sec)) sec = 'inicio';
     st.sec = sec;
     $$('.riel button').forEach((b) => { const a = b.dataset.sec === sec; b.classList.toggle('activo', a); if (a) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $$('.sec').forEach((s) => { s.hidden = s.dataset.sec !== sec; });
-    document.body.classList.toggle('ancho', sec === 'municipios');
+    document.body.classList.toggle('ancho', sec === 'municipios' || sec === 'tabulador');
     st.ubicando = false; st.rutaMarcando = null;
     pista(sec === 'contar' && !st.geocerca ? 'Da clic en el mapa para poner el centro de la zona' : '');
     pintarMarcadoresConf();
@@ -88,6 +90,7 @@
     if (sec === 'reportes') { cargarConfirmaciones().then(() => { pintarReportes(); centrarReportes(); }); }
     if (sec === 'operacion' || sec === 'rutas') cargarConfirmaciones();
     if (sec === 'sismos' || sec === 'clima') textoCentro();
+    if (sec === 'tabulador') cargarTabulador();
   }
   $$('.riel button').forEach((b) => b.addEventListener('click', () => irA(b.dataset.sec)));
   document.addEventListener('click', (ev) => {
@@ -878,6 +881,123 @@
       textoCentro();
     }
   });
+
+  // ---------- Tabulador CAPCEE ----------
+  // Catálogo de precios de referencia. Los datos vienen de data/capcee/tabulador.csv vía /api/tabulador.
+  const TIPO_CLASE = { 'OFICIAL CAPCEE': 'oficial', 'REFERENCIA PÚBLICA': 'referencia', ESTIMADO: 'estimado' };
+  const POR_PAGINA = 20;
+  const tab = { conceptos: [], pagina: 0, pedido: 0 };
+  const dos = (n) => Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dinero = (n) => Number(n).toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Los conceptos con unidad % guardan un porcentaje, no pesos.
+  const precioTab = (c) => (c.unidad === '%' ? `${dos(c.precio)} %` : dinero(c.precio));
+  const etiquetaTipo = (c) => {
+    const fuente = c.fuente || 'Sin fuente registrada';
+    return `<span class="tipo-dato ${TIPO_CLASE[c.tipo_dato] || ''}" tabindex="0" data-fuente="${esc(fuente)}" aria-label="${esc(`${c.tipo_dato}. Fuente: ${fuente}`)}">${esc(c.tipo_dato)}</span>`;
+  };
+  // A diferencia de api(), devuelve también el texto de ayuda del servidor para mostrarlo en el aviso.
+  const apiTab = async (ruta) => {
+    const r = await fetch(ruta);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(j.error || `Error ${r.status}`), { ayuda: j.ayuda || '' });
+    return j;
+  };
+
+  async function cargarTabulador() {
+    const n = ++tab.pedido;
+    const p = new URLSearchParams({ buscar: $('#tBuscar').value.trim(), capitulo: $('#tCapitulo').value, tipo: $('#tTipo').value });
+    try {
+      const [cat, res] = await Promise.all([apiTab(`/api/tabulador?${p}`), apiTab('/api/tabulador/resumen')]);
+      if (n !== tab.pedido) return; // ya hay una búsqueda más reciente
+      $('#tAviso').hidden = true;
+      $('#tContenido').hidden = false;
+      tab.conceptos = cat.conceptos;
+      tab.pagina = 0;
+      pintarKpisTab(res);
+      pintarTablaTab();
+      pintarRechazadosTab(cat.rechazados);
+    } catch (e) {
+      if (n !== tab.pedido) return;
+      $('#tContenido').hidden = true;
+      $('#tAviso').hidden = false;
+      $('#tAviso').innerHTML = `<b>No se pudo cargar el tabulador.</b> ${esc(e.message)}${e.ayuda ? `<br>${esc(e.ayuda)}` : ''}`;
+    }
+  }
+
+  function pintarKpisTab(r) {
+    const t = r.total;
+    $('#tKpis').innerHTML = `
+      <div><b>${fmt(t)}</b><small>conceptos en el catálogo</small></div>
+      <div><b>${fmt(pct(r.porTipo['OFICIAL CAPCEE'], t), 0)} %</b><small>oficiales del CAPCEE</small></div>
+      <div><b>${fmt(pct(r.porTipo.ESTIMADO, t), 0)} %</b><small>estimados, por validar con el CAPCEE</small></div>`;
+  }
+
+  function pintarTablaTab() {
+    const total = tab.conceptos.length;
+    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    tab.pagina = Math.min(Math.max(0, tab.pagina), paginas - 1);
+    const ini = tab.pagina * POR_PAGINA;
+    const filas = tab.conceptos.slice(ini, ini + POR_PAGINA);
+    $('#tTabla tbody').innerHTML = filas.length
+      ? filas.map((c) => `<tr>
+          <td data-l="Clave"><code>${esc(c.clave_ref)}</code></td>
+          <td data-l="Concepto">${esc(c.concepto)}</td>
+          <td data-l="Unidad">${esc(c.unidad)}</td>
+          <td data-l="Precio sin IVA" class="n">${precioTab(c)}</td>
+          <td data-l="Capítulo">${esc(c.capitulo)}</td>
+          <td data-l="Partida">${esc(c.partida_generica) || '–'}</td>
+          <td data-l="Tipo">${etiquetaTipo(c)}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="7" class="celda-vacia">Ningún concepto coincide. Prueba con otra palabra o quita los filtros.</td></tr>';
+    $('#tConteo').textContent = total ? `Conceptos ${fmt(ini + 1)}–${fmt(ini + filas.length)} de ${fmt(total)}` : '';
+    $('#tPag').textContent = `Página ${tab.pagina + 1} de ${paginas}`;
+    $('#tAnt').disabled = tab.pagina === 0;
+    $('#tSig').disabled = tab.pagina >= paginas - 1;
+  }
+
+  function pintarRechazadosTab(lista = []) {
+    const d = $('#tRechazados');
+    d.hidden = !lista.length;
+    d.innerHTML = lista.length
+      ? `<summary>${fmt(lista.length)} renglones del CSV no se cargaron</summary><ul>${lista.map((x) => `<li>Renglón ${x.fila}${x.clave_ref ? ` (${esc(x.clave_ref)})` : ''}: ${esc(x.motivos.join('; '))}</li>`).join('')}</ul><p class="nota">Corrígelos en data/capcee/tabulador.csv; los demás conceptos sí están disponibles.</p>`
+      : '';
+  }
+
+  let esperaTab = null;
+  $('#tBuscar').addEventListener('input', () => { clearTimeout(esperaTab); esperaTab = setTimeout(cargarTabulador, 250); });
+  ['#tCapitulo', '#tTipo'].forEach((s) => $(s).addEventListener('change', cargarTabulador));
+  const irPaginaTab = (d) => { tab.pagina += d; pintarTablaTab(); $('#tTabla').closest('.scroll').scrollTop = 0; };
+  $('#tAnt').addEventListener('click', () => irPaginaTab(-1));
+  $('#tSig').addEventListener('click', () => irPaginaTab(1));
+
+  // Globo con la fuente del precio: con el mouse, el teclado o un toque.
+  const globo = Object.assign(document.createElement('div'), { className: 'globo', hidden: true });
+  globo.setAttribute('role', 'tooltip');
+  document.body.append(globo);
+  let globoDe = null; // etiqueta a la que pertenece el globo visible
+  function colocarGlobo() {
+    if (!globoDe) return;
+    const r = globoDe.getBoundingClientRect();
+    if (!globoDe.isConnected || r.bottom < 0 || r.top > window.innerHeight) { ocultarGlobo(); return; }
+    const x = Math.min(window.innerWidth - globo.offsetWidth - 8, Math.max(8, r.left + r.width / 2 - globo.offsetWidth / 2));
+    const arriba = r.top - globo.offsetHeight - 8;
+    globo.style.left = `${x}px`;
+    globo.style.top = `${arriba >= 8 ? arriba : r.bottom + 8}px`;
+  }
+  function mostrarGlobo(el) {
+    globoDe = el;
+    globo.textContent = `Fuente: ${el.dataset.fuente}`;
+    globo.hidden = false;
+    colocarGlobo();
+  }
+  function ocultarGlobo() { globoDe = null; globo.hidden = true; }
+  document.addEventListener('mouseover', (e) => { const el = e.target.closest('[data-fuente]'); if (el) mostrarGlobo(el); });
+  document.addEventListener('mouseout', (e) => { if (e.target.closest('[data-fuente]') && document.activeElement !== globoDe) ocultarGlobo(); });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest('[data-fuente]'); if (el) mostrarGlobo(el); else ocultarGlobo(); });
+  document.addEventListener('focusout', (e) => { if (e.target === globoDe) ocultarGlobo(); });
+  // Al desplazar la tabla o la página, el globo sigue a su etiqueta (se oculta si sale de la vista).
+  document.addEventListener('scroll', () => requestAnimationFrame(colocarGlobo), true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') ocultarGlobo(); });
 
   // ---------- Escenario ----------
   async function recargarEscenario() {

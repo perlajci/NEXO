@@ -163,6 +163,23 @@ tbody tr.clic{cursor:pointer}tbody tr.clic:hover{background:var(--panel2)}
 .cols i{display:block;width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px}.cols div.sel i{background:#e3742b}
 .ejes{display:flex;gap:2px;font-size:11px;color:var(--muted)}.ejes span{flex:1;text-align:center}
 code{font-size:13px;overflow-wrap:anywhere}
+/* ---------- Tabulador ---------- */
+/* Tipo de dato: verde = oficial CAPCEE, gris = referencia pública, ámbar = estimado. */
+.tipo-dato{display:inline-block;padding:2px 9px;border-radius:99px;border:1px solid transparent;font-size:11.5px;font-weight:700;line-height:1.5;white-space:nowrap;cursor:help}
+.tipo-dato.oficial{background:light-dark(#dcf2e5,#103a25);color:light-dark(#17613a,#8fe0b2);border-color:light-dark(#afdcc1,#1f5c3b)}
+.tipo-dato.referencia{background:light-dark(#eceff3,#1f2b3e);color:light-dark(#475467,#c2cad6);border-color:light-dark(#d3d9e2,#34425a)}
+.tipo-dato.estimado{background:light-dark(#fdefd2,#3a2b0a);color:light-dark(#835400,#f3c860);border-color:light-dark(#f0d398,#5c4512)}
+.tipo-dato:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.leyenda[hidden]{display:none}
+.globo{position:fixed;z-index:2000;max-width:min(340px,calc(100vw - 16px));padding:8px 11px;border-radius:8px;background:#0b2a55;color:#fff;font-size:12.5px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none}
+#tTabla td{vertical-align:top}#tTabla code{font-size:12px;white-space:nowrap}
+#tTabla td:nth-child(2){min-width:220px}
+.celda-vacia{text-align:center;color:var(--muted);padding:24px 8px}
+.paginador{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+.paginador span{font-size:13px;color:var(--muted)}.paginador button:disabled{opacity:.45;cursor:default}
+.aviso-sec{margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;background:var(--panel2);font-size:14px}
+.aviso-sec b{display:block;margin-bottom:2px}
+#tRechazados ul{margin:6px 0;padding-left:18px;font-size:13px}
 @media (max-width:1150px){.app{grid-template-columns:76px 340px minmax(0,1fr)}body.ancho .app{grid-template-columns:76px minmax(0,62%) minmax(0,1fr)}}
 @media (max-width:900px){
   body{overflow:visible;display:block;height:auto}html{height:auto}
@@ -181,6 +198,7 @@ code{font-size:13px;overflow-wrap:anywhere}
   .panel{padding:18px 16px 40px}
   .stack thead{display:none}.stack tr{display:grid;padding-block:8px}.stack td{display:flow-root;border:0;padding:2px 0;padding-inline-start:7.5em;text-align:start}
   .stack td::before{content:attr(data-l);float:inline-start;width:7em;margin-inline-start:-7.5em;color:var(--muted)}
+  #tTabla td:nth-child(2){min-width:0}#tTabla .celda-vacia{padding-inline-start:0;text-align:center}
   .tres span{font-size:20px}
 }
 @media (prefers-reduced-motion:reduce){.progreso i,.riel button,.accion,.publica{transition:none}}
