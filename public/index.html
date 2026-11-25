@@ -93,7 +93,7 @@
     <!-- MAPA DE RIESGO -->
     <section class="sec" data-sec="riesgo" hidden>
       <h1>Mapa de riesgo</h1>
-      <div class="como"><b>Cómo se usa</b> Elige fenómeno y mes arriba. Cada punto es una localidad, del color de su nivel de riesgo; su tamaño indica la población. Da clic en un punto para ver su detalle.</div>
+      <div class="como"><b>Cómo se usa</b> Elige fenómeno y mes arriba. Cada círculo es una localidad, del color de su nivel de riesgo; su tamaño indica la población. Cada cuadro es una escuela (o un grupo de escuelas, con su número, cuando el mapa está lejos). Da clic en un punto o un cuadro para ver su detalle.</div>
       <div id="rKpis" class="kpis"></div>
       <h2>Población por nivel de riesgo</h2>
       <div id="rNivelesEst"></div>
@@ -104,8 +104,19 @@
       <fieldset><legend>Capas</legend><div class="checks">
         <label><input type="checkbox" id="capaPopo" checked>Radio de 12 km del Popocatépetl</label>
         <label><input type="checkbox" id="capaPuntos" checked>Albergues y bases registrados</label>
+        <label><input type="checkbox" id="capaEscuelas" checked>Escuelas (cuadros)</label>
       </div></fieldset>
       <p class="nota" id="notaMes"></p>
+      <h2 id="escTitulo">Escuelas</h2>
+      <div class="segmento chico" role="group" aria-labelledby="escTitulo" id="escFiltro">
+        <button type="button" data-esc-filtro="peligro_afectada" class="activo" aria-pressed="true">En peligro + afectadas</button>
+        <button type="button" data-esc-filtro="peligro" aria-pressed="false">En peligro</button>
+        <button type="button" data-esc-filtro="afectada" aria-pressed="false">Afectadas</button>
+        <button type="button" data-esc-filtro="todas" aria-pressed="false">Todas</button>
+      </div>
+      <p class="nota" id="escEstado" aria-live="polite"></p>
+      <label>Buscar escuela por CCT o nombre <input id="escBuscar" type="search" autocomplete="off" spellcheck="false" placeholder="21DPR1273G o Benito Juárez" aria-controls="escResultados"></label>
+      <ul id="escResultados" class="esc-resultados" aria-label="Escuelas encontradas"></ul>
     </section>
 
     <!-- CONTAR -->
@@ -457,6 +468,7 @@
         <p><b>Vulnerabilidad (0–1):</b> promedio de rangos percentiles de seis indicadores del censo (0–2 y 60+ años, discapacidad, sin servicios de salud, piso de tierra, sin electricidad, sin agua entubada).</p>
         <p><b>Peligro (0–1):</b> volcánico por distancia al cráter (≤12, 30, 60, 100 km); sísmico por densidad histórica de sismos M≥4.5 a 75 km; lluvias y heladas por la climatología del mes.</p>
         <p><b>Peligro volcánico:</b> depende solo de la <b>distancia al cráter del Popocatépetl</b>, en escalones (1 hasta 12 km, 0.7 hasta 30 km, 0.4 hasta 60 km, 0.15 hasta 100 km y 0.05 más lejos). No considera hacia dónde bajan los flujos, la dirección del viento ni el relieve. Es el mismo cálculo para localidades y escuelas. <b>Mejora pendiente:</b> usar el mapa oficial de peligros del volcán Popocatépetl (CENAPRED / UNAM).</p>
+        <p><b>Peligro sísmico:</b> es un <b>índice relativo dentro de Puebla</b>, no una probabilidad de daño. Suma los 206 sismos de magnitud 4.5 o mayor registrados por el USGS desde 1980 a menos de 75 km del punto, ponderados por su energía (un M7.1 pesa unas 20 veces más que un M4.5), lo divide entre el valor más alto del estado y le saca raíz cuadrada. Por eso un 1 significa “la zona con más actividad sísmica histórica de Puebla”, no “daño seguro”. <b>Mejora pendiente:</b> usar la regionalización sísmica oficial (zonas A a D de la CFE) o la aceleración máxima del suelo.</p>
         <p><b>Riesgo = Peligro × (0.5 + 0.5 × Vulnerabilidad).</b> Niveles: bajo &lt;0.2, medio &lt;0.4, alto &lt;0.6, muy alto ≥0.6. Es un índice relativo para priorizar, no el Atlas Nacional de Riesgos.</p></details>
       <details class="caja"><summary>¿Cómo se proponen los albergues?</summary>
         <p>Modelo de cobertura máxima: se eligen, una por una, las localidades con peligro bajo (≤0.4) y suficientes habitantes que alcanzan, dentro de la distancia indicada, a más personas en riesgo, ponderadas por vulnerabilidad. La capacidad sugerida es la población cubierta por el porcentaje que usaría albergue. Hay que verificar en campo el inmueble, su estructura y los accesos.</p></details>
@@ -528,6 +540,7 @@
 </dialog>
 
 <script src="vendor/leaflet.js"></script>
+<script src="escuelas-mapa.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ NEXO parte del censo del INEGI: antes de que llegue el primer reporte ya sabe **
 | Sección | Qué hace |
 |---|---|
 | **Inicio** | Qué se puede hacer, estado de los datos y primeros pasos |
-| **Mapa de riesgo** | Localidades en semáforo según fenómeno y mes; población estatal por nivel; filtros por municipio, nivel y tamaño; capas |
+| **Mapa de riesgo** | Localidades en semáforo según fenómeno y mes; población estatal por nivel; filtros por municipio, nivel y tamaño; capas; **escuelas** en peligro y afectadas, con ficha, reporte de daño, presupuesto, ruta y corrección de ubicación. Ver [Escuelas en el mapa](#escuelas-en-el-mapa) |
 | **Contar población** | Círculo, polígono o zonas rápidas (Popocatépetl 12/30 km, ceniza según viento, todo el estado): población, grupos vulnerables, viviendas, localidades prioritarias, CSV |
 | **Municipios** | Tablero estatal: indicadores, ranking ordenable (riesgo, % en riesgo alto, población, vulnerabilidad, 60+, 0–2, discapacidad), buscador y **ficha de cada municipio** con sismos y clima |
 | **Albergues sugeridos** | Modelo de cobertura máxima: sedes **fuera de la zona de peligro** que alcanzan a más personas en riesgo, ponderadas por vulnerabilidad; capacidad sugerida; localidades sin cubrir; registrar la propuesta como albergue |
@@ -191,7 +191,7 @@ Las escuelas con `decimales_coord = baja` llevan `ubicacion_aproximada = true` y
 
 ### Inmueble (`inmueble_id`)
 
-Varias CCT pueden funcionar en el mismo edificio (turnos, niveles o servicios distintos). Comparten `inmueble_id` las escuelas con **la misma coordenada redondeada a 5 decimales y la misma calle** (lo que va antes de la primera coma del domicilio, sin el número exterior: “Calle 9 Sur 145” y “Calle 9 Sur” son la misma calle; “Calle 9 Sur” y “Calle 21 Poniente”, no).
+Varias CCT pueden funcionar en el mismo edificio (turnos, niveles o servicios distintos). Comparten `inmueble_id` las escuelas con **la misma coordenada redondeada a 5 decimales y la misma calle** (lo que va antes de la primera coma del domicilio, sin el número exterior: “Calle 9 Sur 145” y “Calle 9 Sur” son la misma calle; “Calle 9 Sur” y “Calle 21 Poniente”, no). Antes de comparar se escriben completas las abreviaturas de vialidad: Av. → Avenida, Blvd. → Bulevar, C. → Calle (al inicio), Priv. → Privada, Prol. → Prolongación, Calz. → Calzada.
 
 La calle se compara porque el catálogo repite coordenadas genéricas: en el centro de Puebla, una misma coordenada tiene 166 CCT con 118 domicilios distintos. `coordenada_compartida` dice cuántas CCT más usan esa coordenada con otra calle; la ficha lo avisa como posible punto genérico.
 
@@ -211,6 +211,24 @@ Mismo modelo que las localidades: **Riesgo = Peligro × (0.5 + 0.5 · V)**.
 
 - **En peligro:** nivel de riesgo alto o muy alto con el fenómeno y el mes elegidos. Es una **estimación del modelo**.
 - **Afectada:** escuela con al menos un reporte de daño leve o mayor. Es un **dato de campo**. Una escuela puede ser ambas cosas; afectada tiene prioridad visual.
+
+### Escuelas en el mapa
+
+Capa **Escuelas (cuadros)** en Mapa de riesgo, encima de las localidades (círculos). Cada señal significa una sola cosa:
+
+| Señal | Significado |
+|---|---|
+| **Color del relleno** | Estado: rojo = afectada con daño grave o inhabitable · naranja = afectada con daño leve o moderado · amarillo = en peligro sin daño reportado · gris = sin riesgo alto |
+| **Borde punteado** | Solo daño **por verificar** |
+| **Cuadro hueco** | Ubicación dudosa: coordenada aproximada (`decimales_coord = baja`) o compartida por 3 o más inmuebles. La ficha dice cuál |
+
+- **Filtro rápido:** En peligro + afectadas (por defecto), En peligro, Afectadas o Todas.
+- **Agrupación:** en zoom lejano las escuelas se agrupan por celda de 56 px en el navegador, sin librerías (`public/escuelas-mapa.js`); el cuadro del grupo lleva el número de escuelas y el color del estado más urgente. Desde el zoom 12 se dibuja una escuela por cuadro, solo las que están a la vista.
+- **Ficha** (clic en una escuela): estado, ubicación dudosa, riesgo con los cuatro fenómenos, vulnerabilidad y su localidad, población a 2 km, albergue más cercano, CCT del mismo inmueble y reportes (con “Marcar verificado”). Botones: **Reportar daño**, **Armar presupuesto** (abre el Tabulador con la obra y la CCT), **Cómo llegar** (la escuela queda como destino en Rutas) y **Corregir ubicación**.
+- **Buscador** por CCT o nombre: centra el mapa y abre la ficha, aunque la escuela no entre en el filtro.
+- **Corregir ubicación:** el cuadro se vuelve arrastrable; al soltarlo se confirma y se guarda en `data/escuelas/correcciones.json` con `fuente = "manual"`, **sin tocar el CSV**. Mueve todo el inmueble (todas sus CCT), hasta 20 km. La escuela queda con `fuente_coord = "manual"` y la coordenada original en `coord_original`. Ese archivo está en `.gitignore` y, como los demás datos de operación, se borra al reiniciar en Render gratuito.
+- Al cambiar fenómeno o mes, la capa se vuelve a pedir junto con las localidades.
+- **Enlaces:** `?fenomeno=sismico&mes=11` elige el escenario, `?lat=&lon=&z=` la vista y `?escuela=21DPR1273G` abre la ficha (por ejemplo `/?fenomeno=volcanico&mes=11&escuela=21DPR1273G#riesgo`).
 
 ### Reportes de daño (`lib/reportes-escuelas.js`)
 
@@ -233,7 +251,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 97 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js` y 8 de reportes de daño en `test/escuelas-reportes.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 105 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`, 8 de reportes de daño en `test/escuelas-reportes.test.js` y 8 del mapa de escuelas en `test/escuelas-mapa.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
@@ -267,6 +285,7 @@ Pruebas del tabulador (40):
 | GET | `/api/escuela/:cct?fenomeno=&mes=` | Ficha: datos, localidad del censo más cercana y su distancia, avisos (vulnerabilidad referencial, coordenada aproximada o compartida, daño por verificar), CCT del mismo inmueble, riesgo con los cuatro fenómenos, población en 2 km, albergue más cercano, daño, reportes e historial (también acepta `DENUE-<id>`) |
 | GET/POST | `/api/escuelas/:cct/reportes` | Reportes que aplican a la escuela (los de todo su inmueble) y su daño; alta `{dano, descripcion, fecha, origen, estado}` (400 si el daño o la fecha no son válidos) |
 | PATCH | `/api/escuelas/:cct/reportes/:id` | `{estado: "verificado" \| "pendiente", nota}`; queda en el historial |
+| POST/DELETE | `/api/escuelas/:cct/ubicacion` | Corrige la ubicación `{lat, lon, nota}` de todo el inmueble (dentro de Puebla y a 20 km o menos de la original; 400 si no) o la deshace |
 | POST | `/api/lora/trama` | Trama de un nodo ESP32 |
 | GET/POST/DELETE | `/api/confirmaciones` | Albergues, bases y reportes |
 | GET | `/api/tabulador?buscar=&capitulo=&tipo=` | Conceptos del tabulador filtrados (409 con aviso si falta el CSV) |

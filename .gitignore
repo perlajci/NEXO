@@ -6,3 +6,5 @@ data/capcee/historial/
 # Catálogo nacional de la SEP (pesa ~190 MB); se usa el recorte data/escuelas/escuelas_puebla.csv
 data/escuelas/cnct*.csv
 data/escuelas/original/
+# Correcciones de ubicación hechas en el mapa (datos de operación, como confirmaciones.json)
+data/escuelas/correcciones.json

@@ -19,7 +19,9 @@ import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DAT
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
 import { crearAlmacenJSON } from './lib/almacen.js';
-import { cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA, NIVELES_ESCOLARES } from './lib/escuelas.js';
+import {
+  cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA, NIVELES_ESCOLARES, aplicarCorrecciones, validarCorreccion, ubicacionDudosa,
+} from './lib/escuelas.js';
 import { prepararEscuelas, riesgoEscuela, riesgoPorFenomeno, enPeligro, filtrarEscuelas, resumenEscuelas } from './lib/riesgo-escuelas.js';
 import {
   crearReporteEscuela, cambiarEstadoReporte, reportesDeEscuela, danoPorEscuela, normalizarDano, ErrorReporte, DANOS, NOMBRE_DANO, ORIGENES,
@@ -41,6 +43,9 @@ const ARCHIVO_PLANTELES = path.join(DATA, 'capcee', 'planteles.csv'); // opciona
 const presupuestos = crearAlmacenJSON(path.join(DATA, 'presupuestos.json'));
 const DIR_HISTORIAL_TAB = path.join(DATA, 'capcee', 'historial');
 const DIR_ESCUELAS = path.join(DATA, 'escuelas');
+// Correcciones de ubicación hechas en el mapa: aparte del CSV original, con la misma capa de almacén.
+const ARCHIVO_CORRECCIONES = path.join(DIR_ESCUELAS, 'correcciones.json');
+const correcciones = crearAlmacenJSON(ARCHIVO_CORRECCIONES);
 const AVISO_RENDER_TAB = 'En el plan gratuito de Render el disco se borra al reiniciar: el tabulador cargado aquí y su historial se pierden y vuelve el CSV del repositorio. Para conservarlo, sube el CSV nuevo al repositorio (data/capcee/tabulador.csv) o usa una base de datos.';
 const AVISO_DISCO ='Los presupuestos se guardan en un archivo del servidor. En el plan gratuito de Render el disco se borra al reiniciar: exporta a CSV los que necesites conservar.';
 
@@ -160,15 +165,23 @@ const requiereTabulador = (res) => {
 // Se vuelven a leer solo si cambian los CSV de la carpeta, así un archivo nuevo se ve sin reiniciar.
 // Sin archivo no se truena: queda un aviso para la sección.
 const AVISO_SIN_ESCUELAS = 'No hay escuelas cargadas. Copia en data/escuelas/ el CSV del Catálogo de Centros de Trabajo de la SEP o del DENUE del INEGI para Puebla (ver README).';
-let escCache = { marca: null, datos: null };
+// Dos niveles: el CSV (pesado) se relee solo si cambia; las correcciones se aplican encima cada vez
+// que cambian, sin volver a leer el CSV.
+let escCache = { marca: null, base: null, marcaCorr: null, datos: null };
+const marcaArchivo = (f) => { try { const x = fs.statSync(f); return `${x.size}:${x.mtimeMs}`; } catch { return 'no'; } };
 function escuelas() {
   const marca = marcaCarpeta(DIR_ESCUELAS);
   if (escCache.marca !== marca) {
-    let datos = null;
-    try { datos = cargarEscuelasDesdeCarpeta(DIR_ESCUELAS); } catch (e) { datos = { escuelas: [], resumen: null, descartes: [], errores: [e.message] }; }
-    escCache = { marca, datos };
-    if (datos?.escuelas.length) console.log(`Escuelas: ${datos.escuelas.length} con coordenadas en Puebla (${datos.resumen.archivos.map((a) => a.archivo).join(', ')})`);
-    for (const e of datos?.errores || []) console.error('Escuelas:', e);
+    let base = null;
+    try { base = cargarEscuelasDesdeCarpeta(DIR_ESCUELAS); } catch (e) { base = { escuelas: [], resumen: null, descartes: [], errores: [e.message] }; }
+    escCache = { marca, base, marcaCorr: null, datos: null };
+    if (base?.escuelas.length) console.log(`Escuelas: ${base.escuelas.length} con coordenadas en Puebla (${base.resumen.archivos.map((a) => a.archivo).join(', ')})`);
+    for (const e of base?.errores || []) console.error('Escuelas:', e);
+  }
+  const marcaCorr = marcaArchivo(ARCHIVO_CORRECCIONES);
+  if (escCache.base && escCache.marcaCorr !== marcaCorr) {
+    escCache.marcaCorr = marcaCorr;
+    escCache.datos = { ...escCache.base, escuelas: aplicarCorrecciones(escCache.base.escuelas, correcciones.listar()) };
   }
   return escCache.datos;
 }
@@ -252,10 +265,10 @@ const requiereCatalogoEscuelas = (res) => {
 const requiereEscuelas = (res) => requiereITER(res) || requiereCatalogoEscuelas(res);
 const COLUMNAS_ESCUELAS = ['id', 'cct', 'nombre', 'nivel', 'tipo_ct', 'es_inmueble_escolar', 'municipio', 'mun', 'localidad', 'lat', 'lon', 'alumnos',
   'ubicacion_aproximada', 'P', 'V', 'R', 'riesgo', 'enPeligro', 'afectada', 'distLocKm', 'vulnerabilidad_referencial', 'inmueble_id',
-  'dano', 'danoVerificado', 'danoDeCct'];
+  'dano', 'danoVerificado', 'danoDeCct', 'coordenada_compartida', 'fuente_coord', 'domicilio'];
 const filaEscuela = (f) => [f.e.id, f.e.cct, f.e.nombre, f.e.nivel, f.e.tipo_ct, f.e.es_inmueble_escolar, f.e.municipio, f.mun, f.e.localidad,
   f.e.lat, f.e.lon, f.e.alumnos, f.e.ubicacion_aproximada, f.riesgo.p, f.riesgo.V, f.riesgo.r, f.riesgo.nivel, f.enPeligro, f.afectada, f.distLocKm, f.vulnerabilidadReferencial, f.e.inmueble_id,
-  f.dano?.dano ?? null, f.dano ? f.dano.verificado : null, f.dano?.deCct ?? null];
+  f.dano?.dano ?? null, f.dano ? f.dano.verificado : null, f.dano?.deCct ?? null, f.e.coordenada_compartida || 0, f.e.fuente_coord, f.e.domicilio];
 
 function fichaEscuela(id, fenomeno, mes) {
   const filas = filasEscuelas(fenomeno, mes);
@@ -274,10 +287,13 @@ function fichaEscuela(id, fenomeno, mes) {
     mun: f.mun,
     localidadCercana: f.loc ? { id: f.loc.id, nom: f.loc.nom, nomMun: f.loc.nomMun, distanciaKm: f.distLocKm, V: f.loc.V, POBTOT: f.loc.POBTOT } : null,
     vulnerabilidad_referencial: f.vulnerabilidadReferencial,
+    // Por qué la ubicación es dudosa: 'aproximada' (pocos decimales) y/o 'compartida' (3+ inmuebles en el mismo punto).
+    ubicacionDudosa: ubicacionDudosa(f.e),
     avisos: [
       ...(f.vulnerabilidadReferencial ? [`La localidad del censo más cercana está a ${f.distLocKm} km: la vulnerabilidad es solo referencial.`] : []),
       ...(f.e.ubicacion_aproximada ? ['La coordenada de esta escuela es aproximada (2 decimales o menos, ≈1 km).'] : []),
       ...(f.e.coordenada_compartida ? [`Otras ${f.e.coordenada_compartida} CCT con otro domicilio usan esta misma coordenada: puede ser un punto genérico.`] : []),
+      ...(f.e.fuente_coord === 'manual' ? [`Ubicación corregida a mano (CCT ${f.e.correccion.cct}, ${f.e.correccion.fecha.slice(0, 10)}).`] : []),
       ...(f.dano?.porVerificar ? ['El daño reportado está por verificar.'] : []),
     ],
     mismoInmueble: filas.filter((x) => x.e.inmueble_id === f.e.inmueble_id && x !== f).map((x) => ({ id: x.e.id, cct: x.e.cct, nombre: x.e.nombre, nivel: x.e.nivel })),
@@ -841,6 +857,22 @@ async function api(req, res, url) {
       guardarConfirmaciones(lista);
       return enviar(res, 200, lista[i]);
     }
+    return enviar(res, 405, { error: 'Método no permitido' });
+  }
+  // Corrección de ubicación: POST {lat, lon, nota} · DELETE (vuelve a la del catálogo). Mueve todo el inmueble.
+  const mu = ruta.match(/^\/api\/escuelas\/([^/]{1,40})\/ubicacion$/);
+  if (mu) {
+    if (requiereCatalogoEscuelas(res)) return;
+    const esc = buscarEscuela(decodeURIComponent(mu[1]));
+    if (!esc) return enviar(res, 404, { error: 'Escuela no encontrada' });
+    if (req.method === 'POST') {
+      let c;
+      try { c = validarCorreccion(await leerCuerpo(req), esc); } catch (e) { return enviar(res, 400, { error: e.message }); }
+      correcciones.guardar(c);
+      const mismas = escuelas().escuelas.filter((x) => x.inmueble_id === esc.inmueble_id).map((x) => x.cct || x.id);
+      return enviar(res, 200, { correccion: c, escuelas: mismas });
+    }
+    if (req.method === 'DELETE') return enviar(res, 200, { ok: correcciones.borrar(esc.inmueble_id) });
     return enviar(res, 405, { error: 'Método no permitido' });
   }
   if (ruta.startsWith('/api/escuela/') && req.method === 'GET') {

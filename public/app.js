@@ -63,9 +63,9 @@
     maxZoom: 18, attribution: '&copy; OpenStreetMap · Datos: INEGI ITER 2020, USGS, Open-Meteo',
   }).addTo(mapa);
   const capas = {};
-  for (const k of ['loc', 'geo', 'vert', 'conf', 'popo', 'mun', 'alb', 'ruta', 'sis', 'punto']) capas[k] = L.layerGroup();
+  for (const k of ['loc', 'geo', 'vert', 'conf', 'popo', 'mun', 'alb', 'ruta', 'sis', 'punto', 'esc']) capas[k] = L.layerGroup();
   const CAPAS_SEC = {
-    inicio: ['loc', 'popo', 'conf'], riesgo: ['loc', 'popo', 'conf'], contar: ['loc', 'geo', 'vert', 'conf'],
+    inicio: ['loc', 'popo', 'conf', 'esc'], riesgo: ['loc', 'popo', 'conf', 'esc'], contar: ['loc', 'geo', 'vert', 'conf'],
     municipios: ['mun', 'geo'], albergues: ['loc', 'alb'], reportes: ['conf'], operacion: ['loc', 'geo', 'conf'],
     rutas: ['conf', 'ruta'], sismos: ['sis', 'punto', 'geo'], clima: ['punto', 'geo'], ayuda: ['loc'],
     tabulador: [],
@@ -75,7 +75,9 @@
     if (st.sec === 'reportes' && !st.repConRiesgo) {
       $('#leyenda').innerHTML = Object.entries(NOM_TIPO).map(([k, v]) => `<span><i style="background:${COLOR_TIPO[k]}"></i>${v}</span>`).join('');
     } else {
-      $('#leyenda').innerHTML = NIV_ORDEN.map((n) => `<span><i style="background:${COLOR[n]}"></i>${NOM_NIV[n]}</span>`).join('');
+      const conEsc = mapa.hasLayer(capas.esc) && hayEscuelas();
+      $('#leyenda').innerHTML = (conEsc ? '<b>Localidades</b> (círculos):' : '') + NIV_ORDEN.map((n) => `<span><i style="background:${COLOR[n]}"></i>${NOM_NIV[n]}</span>`).join('')
+        + (conEsc ? leyendaEscuelas() : '');
     }
   }
   function mostrarCapas(sec) {
@@ -84,6 +86,7 @@
     if (sec === 'riesgo' || sec === 'inicio') {
       if (!$('#capaPopo').checked) quiero.delete('popo');
       if (!$('#capaPuntos').checked) quiero.delete('conf');
+      if (!$('#capaEscuelas').checked) quiero.delete('esc');
     }
     for (const [k, c] of Object.entries(capas)) {
       if (quiero.has(k)) c.addTo(mapa); else mapa.removeLayer(c);
@@ -129,6 +132,10 @@
     $('#fFenomeno').innerHTML = Object.entries(meta.fenomenos).map(([k, v]) => `<option value="${esc(k)}">${esc(v.nombre)}</option>`).join('');
     const mesActual = new Date().getMonth() + 1;
     $('#fMes').innerHTML = MESES.map((m, i) => `<option value="${i + 1}" ${i + 1 === mesActual ? 'selected' : ''}>${m}</option>`).join('');
+    // Escenario desde la dirección (?fenomeno=sismico&mes=11), para compartir un enlace.
+    const qs = new URLSearchParams(location.search);
+    if (meta.fenomenos[qs.get('fenomeno')]) $('#fFenomeno').value = qs.get('fenomeno');
+    if (Number(qs.get('mes')) >= 1 && Number(qs.get('mes')) <= 12) $('#fMes').value = String(Number(qs.get('mes')));
     $('#fNiveles').innerHTML = NIV_ORDEN.slice(0, 4).map((n) => `<label><input type="checkbox" value="${n}"><span class="punto" style="background:${COLOR[n]}"></span>${NOM_NIV[n]}</label>`).join('');
     $('#cNec').innerHTML = meta.necesidades.map((n) => `<label><input type="checkbox" name="nec" value="${esc(n)}">${esc(NOM_NEC[n] || n)}</label>`).join('');
     $('#leyenda').innerHTML = NIV_ORDEN.map((n) => `<span><i style="background:${COLOR[n]}"></i>${NOM_NIV[n]}</span>`).join('');
@@ -269,6 +276,261 @@
     $('#iPob').textContent = Number(e.poblacion).toLocaleString('es-MX', { notation: 'compact', maximumFractionDigits: 2 });
     $('#iMun').textContent = fmt(munAltos);
   }
+
+  // ---------- Escuelas en el mapa ----------
+  // Reglas visuales y agrupación en escuelas-mapa.js (window.PianiEscuelas). Por defecto se piden solo
+  // las escuelas en peligro o afectadas; en zoom lejano se agrupan por celda y desde ZOOM_INDIVIDUAL se
+  // dibuja una por marcador (solo las que están a la vista).
+  const PE = window.PianiEscuelas;
+  const NOM_FILTRO_ESC = { peligro_afectada: 'en peligro o afectadas', peligro: 'en peligro', afectada: 'afectadas', todas: 'todas' };
+  const NOM_DANO = { sin_dano: 'Sin daño', leve: 'Leve', moderado: 'Moderado', grave: 'Grave', inhabitable: 'Inhabitable' };
+  const NOM_FEN_CORTO = { volcanico: 'Volcánico', sismico: 'Sísmico', lluvias: 'Lluvias', heladas: 'Heladas' };
+  st.esc = { filtro: 'peligro_afectada', filas: [], total: 0, pedido: 0, ms: null, marcadores: new Map(), extra: null, editando: null };
+  const escVisible = () => mapa.hasLayer(capas.esc);
+  const hayEscuelas = () => !!st.meta?.escuelas?.cargadas;
+
+  async function cargarEscuelas() {
+    if (!hayEscuelas() || !st.meta?.iter) {
+      capas.esc.clearLayers();
+      $('#escEstado').textContent = st.meta?.escuelas?.aviso || 'No hay escuelas cargadas.';
+      return;
+    }
+    const e = escenario();
+    const pedido = ++st.esc.pedido; // si el escenario cambia a media descarga, gana la última
+    $('#escEstado').textContent = 'Cargando escuelas…';
+    const t0 = performance.now();
+    let r;
+    try { r = await api(`/api/escuelas?fenomeno=${encodeURIComponent(e.fenomeno)}&mes=${e.mes}&estado=${st.esc.filtro}`); } catch (err) {
+      if (pedido === st.esc.pedido) $('#escEstado').textContent = `No se pudieron cargar las escuelas: ${err.message}`;
+      return;
+    }
+    if (pedido !== st.esc.pedido) return;
+    const t1 = performance.now();
+    st.esc.filas = r.datos.map((d) => Object.fromEntries(r.columnas.map((c, i) => [c, d[i]])));
+    st.esc.total = r.total;
+    const t2 = performance.now();
+    pintarEscuelas();
+    const t3 = performance.now();
+    st.esc.ms = { descarga: Math.round(t1 - t0), preparar: Math.round(t2 - t1), dibujo: Math.round(t3 - t2) };
+    escribirEstadoEscuelas();
+  }
+  function escribirEstadoEscuelas() {
+    const m = st.esc.ms;
+    const inm = new Set(st.esc.filas.map((f) => f.inmueble_id)).size;
+    const modo = mapa.getZoom() >= PE.ZOOM_INDIVIDUAL ? 'una por cuadro' : 'agrupadas: acércate para verlas una por una';
+    $('#escEstado').textContent = `${fmt(st.esc.total)} escuelas ${NOM_FILTRO_ESC[st.esc.filtro]} en ${fmt(inm)} inmuebles (${modo}).${m ? ` Capa: descarga ${fmt(m.descarga)} ms, dibujo ${fmt(m.preparar + m.dibujo)} ms.` : ''}`;
+  }
+
+  function marcadorEscuela(f) {
+    const icono = L.divIcon({ className: 'esc-icono', html: `<span class="${PE.claseMarcador(f)}"></span>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+    const m = L.marker([f.lat, f.lon], { icon: icono, title: `${f.nombre} (${f.cct || f.id}): ${PE.ETIQUETA[PE.categoria(f)]}`, riseOnHover: true, keyboard: true });
+    m.on('click', () => abrirFichaEscuela(f));
+    st.esc.marcadores.set(f.id, m);
+    return m;
+  }
+  function marcadorGrupo(g) {
+    const t = PE.tamGrupo(g.n);
+    const icono = L.divIcon({
+      className: 'esc-icono',
+      html: `<span class="esc-grupo esc-${g.categoria}${g.porVerificar ? ' esc-verificar' : ''}" style="width:${t}px;height:${t}px"><b>${fmt(g.n)}</b></span>`,
+      iconSize: [t, t], iconAnchor: [t / 2, t / 2],
+    });
+    const m = L.marker([g.lat, g.lon], { icon: icono, title: PE.textoGrupo(g), keyboard: true });
+    m.on('click', () => {
+      const b = L.latLngBounds([g.sur, g.oeste], [g.norte, g.este]);
+      if (b.getNorthEast().distanceTo(b.getSouthWest()) < 300) mapa.setView(b.getCenter(), Math.max(mapa.getZoom() + 2, PE.ZOOM_INDIVIDUAL + 3));
+      else mapa.fitBounds(b.pad(0.15), { maxZoom: Math.max(PE.ZOOM_INDIVIDUAL, mapa.getZoom() + 2) });
+    });
+    return m;
+  }
+  function pintarEscuelas() {
+    capas.esc.clearLayers();
+    st.esc.marcadores.clear();
+    if (!st.esc.filas.length && !st.esc.extra) return;
+    const z = mapa.getZoom();
+    if (z >= PE.ZOOM_INDIVIDUAL) {
+      const vista = mapa.getBounds().pad(0.25);
+      const filas = st.esc.filas.filter((f) => vista.contains([f.lat, f.lon]));
+      if (st.esc.extra && !filas.some((f) => f.id === st.esc.extra.id)) filas.push(st.esc.extra);
+      for (const f of filas) marcadorEscuela(f).addTo(capas.esc);
+    } else {
+      for (const g of PE.agrupar(st.esc.filas, (f) => mapa.project([f.lat, f.lon], z))) {
+        (g.n === 1 ? marcadorEscuela(g.filas[0]) : marcadorGrupo(g)).addTo(capas.esc);
+      }
+    }
+  }
+  let repintarEsc = null;
+  mapa.on('zoomend moveend', () => {
+    if (!escVisible() || st.esc.editando) return;
+    clearTimeout(repintarEsc);
+    repintarEsc = setTimeout(() => { pintarEscuelas(); escribirEstadoEscuelas(); }, 80);
+  });
+
+  // Ficha de la escuela (globo del mapa)
+  function estadoTexto(x) {
+    if (x.afectada) {
+      const d = x.dano;
+      return `Afectada: daño ${NOM_DANO[d.dano].toLowerCase()} · ${d.verificado ? 'verificado' : '<b>por verificar</b>'}${d.deCct && d.deCct !== x.escuela.cct ? ` · reportado en ${esc(d.deCct)} (mismo inmueble)` : ''}`;
+    }
+    if (x.enPeligro) return `En peligro (estimación del modelo: riesgo ${NOM_NIV[x.riesgo.nivel].toLowerCase()})`;
+    return 'Sin riesgo alto con este escenario';
+  }
+  function htmlFichaEscuela(x) {
+    const e = x.escuela;
+    const f = { afectada: x.afectada, dano: x.dano?.dano, danoVerificado: x.dano ? x.dano.verificado : null, enPeligro: x.enPeligro, ubicacion_aproximada: e.ubicacion_aproximada, coordenada_compartida: e.coordenada_compartida };
+    const dudosa = (x.ubicacionDudosa || []).map((m) => (m === 'aproximada' ? 'coordenada aproximada (≈1 km)' : `coordenada compartida con ${fmt(e.coordenada_compartida)} CCT de otras calles`));
+    const fen = escenario().fenomeno;
+    const filasRiesgo = Object.entries(x.riesgoPorFenomeno).map(([k, r]) => `<tr${k === fen ? ' class="actual"' : ''}><td>${NOM_FEN_CORTO[k] || esc(k)}</td><td>${etiquetaNivel(r.nivel)}</td><td>${r.p ?? '–'}</td><td>${r.r ?? '–'}</td></tr>`).join('');
+    const pendientes = x.reportes.filter((r) => r.estado === 'pendiente');
+    return `<div class="esc-ficha">
+      <h3><span class="${PE.claseMarcador(f)}" aria-hidden="true"></span>${esc(e.nombre)}</h3>
+      <p class="nota">${esc(e.cct || e.id)} · ${esc(e.nivel || 'sin nivel')}${e.es_inmueble_escolar === false ? ' · CONAFE (puede funcionar en una casa)' : ''}<br>${esc(e.localidad)}, ${esc(e.municipio)}${e.domicilio ? `<br>${esc(e.domicilio)}` : ''}</p>
+      <p class="esc-estado esc-fondo-${PE.categoria(f)}">${estadoTexto(x)}</p>
+      ${dudosa.length ? `<p class="esc-aviso"><b>Ubicación dudosa:</b> ${dudosa.join(' y ')}.</p>` : ''}
+      ${x.avisos.filter((a) => !/aproximada|misma coordenada/.test(a)).map((a) => `<p class="esc-aviso">${esc(a)}</p>`).join('')}
+      <table class="esc-riesgo"><thead><tr><th>Fenómeno</th><th>Riesgo</th><th>Peligro</th><th>Índice</th></tr></thead><tbody>${filasRiesgo}</tbody></table>
+      <p class="nota">Vulnerabilidad ${x.riesgo.V ?? '0.5 (sin dato)'} de ${esc(x.localidadCercana?.nom || '–')}, a ${fmt(x.localidadCercana?.distanciaKm, 2)} km${x.vulnerabilidad_referencial ? ' (referencial)' : ''}. Población a 2 km: ${fmt(x.poblacion2km.total.POBTOT)}.</p>
+      <p>${x.albergueCercano ? `Albergue más cercano: <b>${esc(x.albergueCercano.nombre)}</b>, a ${fmt(x.albergueCercano.distanciaKm, 1)} km en línea recta.` : 'No hay albergues registrados todavía.'}</p>
+      ${x.mismoInmueble.length ? `<p class="nota">Mismo inmueble: ${x.mismoInmueble.map((m) => esc(m.cct || m.id)).join(', ')}.</p>` : ''}
+      ${x.reportes.length ? `<details><summary>${x.reportes.length} reporte(s) de daño${pendientes.length ? `, ${pendientes.length} por verificar` : ''}</summary><ul class="esc-reportes">${x.reportes.map((r) => `<li>${esc(NOM_DANO[r.dano])} · ${esc(r.estado)} · ${esc(new Date(r.fecha_dano).toLocaleDateString('es-MX'))} · ${esc(r.origen)}${r.propio ? '' : ` · de ${esc(r.deCct)}`}${r.descripcion ? `<br><small>${esc(r.descripcion)}</small>` : ''}${r.estado === 'pendiente' ? ` <button type="button" class="chico" data-esc-verificar="${esc(r.id)}">Marcar verificado</button>` : ''}</li>`).join('')}</ul></details>` : ''}
+      <div class="esc-botones">
+        <button type="button" data-esc-accion="reportar">Reportar daño</button>
+        <button type="button" data-esc-accion="presupuesto"${e.es_inmueble_escolar === false ? ' title="Centro CONAFE: puede no ser un inmueble escolar"' : ''}>Armar presupuesto</button>
+        <button type="button" data-esc-accion="ruta">Cómo llegar</button>
+        <button type="button" data-esc-accion="mover">Corregir ubicación</button>
+      </div>
+      <form class="esc-form" hidden>
+        <label>Daño <select name="dano" required>${Object.entries(NOM_DANO).map(([k, v]) => `<option value="${k}"${k === 'leve' ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label>Descripción <textarea name="descripcion" rows="2" maxlength="500" placeholder="Qué se ve dañado"></textarea></label>
+        <label>Fecha del daño <input name="fecha" type="date" max="${new Date().toISOString().slice(0, 10)}"></label>
+        <p class="nota">Queda <b>por verificar</b> hasta que alguien lo confirme en campo.${x.mismoInmueble.length ? ` Se aplica también a ${x.mismoInmueble.length} CCT del mismo inmueble.` : ''}</p>
+        <button type="submit" class="primario">Guardar reporte</button> <span class="esc-msg" role="status"></span>
+      </form>
+    </div>`;
+  }
+  async function abrirFichaEscuela(f) {
+    const popup = L.popup({ maxWidth: 360, minWidth: 280, className: 'esc-popup', autoPanPadding: [20, 20] })
+      .setLatLng([f.lat, f.lon]).setContent('<p class="nota">Cargando ficha…</p>').openOn(mapa);
+    const e = escenario();
+    let x;
+    try { x = await api(`/api/escuela/${encodeURIComponent(f.id)}?fenomeno=${e.fenomeno}&mes=${e.mes}`); } catch (err) { popup.setContent(`<p>${esc(err.message)}</p>`); return; }
+    popup.setContent(htmlFichaEscuela(x));
+    const raiz = popup.getElement();
+    if (!raiz) return;
+    raiz.querySelector('[data-esc-accion="reportar"]').onclick = () => { const fm = raiz.querySelector('.esc-form'); fm.hidden = !fm.hidden; popup.update(); if (!fm.hidden) fm.querySelector('select').focus(); };
+    raiz.querySelector('[data-esc-accion="presupuesto"]').onclick = () => armarPresupuestoEscuela(x);
+    raiz.querySelector('[data-esc-accion="ruta"]').onclick = () => {
+      st.ruta.destino = { lat: x.escuela.lat, lon: x.escuela.lon, nombre: `${x.escuela.nombre} (${x.escuela.cct || x.escuela.id})` };
+      mapa.closePopup();
+      irA('rutas');
+      pintarPuntosRuta();
+      $('#rtRes').innerHTML = '<p class="nota">La escuela quedó como destino. Elige de dónde sale la ayuda (por ejemplo, “Base más cercana”) y calcula la ruta.</p>';
+    };
+    raiz.querySelector('[data-esc-accion="mover"]').onclick = () => corregirUbicacion(f, x);
+    raiz.querySelectorAll('[data-esc-verificar]').forEach((b) => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api(`/api/escuelas/${encodeURIComponent(f.id)}/reportes/${encodeURIComponent(b.dataset.escVerificar)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'verificado' }) }); } catch (err) { b.disabled = false; b.textContent = err.message; return; }
+        await cargarEscuelas();
+        abrirFichaEscuela(f);
+      };
+    });
+    raiz.querySelector('.esc-form').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const msg = raiz.querySelector('.esc-msg');
+      msg.textContent = 'Guardando…';
+      try {
+        await postJSON(`/api/escuelas/${encodeURIComponent(f.id)}/reportes`, { dano: fd.get('dano'), descripcion: fd.get('descripcion'), fecha: fd.get('fecha') || undefined, origen: 'manual' });
+      } catch (err) { msg.textContent = err.message; return; }
+      await cargarEscuelas();
+      abrirFichaEscuela(f);
+    };
+  }
+  // "Armar presupuesto": abre el Tabulador con la obra y la CCT de la escuela (el paso 6 agrega riesgo y daño).
+  function armarPresupuestoEscuela(x) {
+    mapa.closePopup();
+    irA('tabulador');
+    verVistaTab('pres');
+    $('#pObra').value = `Rehabilitación de ${x.escuela.nombre}`.slice(0, 120);
+    $('#pCct').value = x.escuela.cct || '';
+    ['#pObra', '#pCct'].forEach((s) => $(s).dispatchEvent(new Event('input', { bubbles: true })));
+    $('#pObra').focus();
+  }
+  // Corregir ubicación: el cuadro se vuelve arrastrable; al soltarlo se pide confirmación y se guarda
+  // en data/escuelas/correcciones.json (el CSV original no cambia). Mueve todo el inmueble.
+  async function corregirUbicacion(f, x) {
+    mapa.closePopup();
+    st.esc.extra = f;
+    mapa.setView([f.lat, f.lon], Math.max(mapa.getZoom(), 17));
+    await new Promise((r) => setTimeout(r, 150));
+    pintarEscuelas();
+    const m = st.esc.marcadores.get(f.id);
+    if (!m) return;
+    st.esc.editando = f.id;
+    m.dragging.enable();
+    m.getElement()?.classList.add('esc-arrastrando');
+    pista('Arrastra el cuadro de la escuela a su ubicación correcta y suéltalo. Esc para cancelar.');
+    const terminar = () => { st.esc.editando = null; st.esc.extra = null; pista(''); document.removeEventListener('keydown', alEsc); pintarEscuelas(); };
+    const alEsc = (ev) => { if (ev.key === 'Escape') terminar(); };
+    document.addEventListener('keydown', alEsc);
+    m.once('dragend', async () => {
+      const p = m.getLatLng();
+      const n = x.mismoInmueble.length;
+      const ok = await confirmar({
+        titulo: 'Guardar la nueva ubicación',
+        texto: `${x.escuela.nombre}: nueva ubicación ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}.${n ? ` También se mueven ${n} CCT del mismo inmueble.` : ''} El CSV original no cambia.`,
+        aceptar: 'Guardar', peligro: false,
+      });
+      if (ok) {
+        try { await postJSON(`/api/escuelas/${encodeURIComponent(f.id)}/ubicacion`, { lat: p.lat, lon: p.lng }); } catch (err) { pista(err.message); setTimeout(() => pista(''), 5000); }
+      }
+      terminar();
+      await cargarEscuelas();
+    });
+  }
+
+  // Filtro rápido y buscador
+  $('#escFiltro').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-esc-filtro]');
+    if (!b) return;
+    st.esc.filtro = b.dataset.escFiltro;
+    $$('#escFiltro button').forEach((x) => { const a = x === b; x.classList.toggle('activo', a); x.setAttribute('aria-pressed', String(a)); });
+    cargarEscuelas();
+  });
+  let buscarEscT = null;
+  $('#escBuscar').addEventListener('input', () => {
+    clearTimeout(buscarEscT);
+    const q = $('#escBuscar').value.trim();
+    if (q.length < 3) { $('#escResultados').innerHTML = ''; return; }
+    buscarEscT = setTimeout(async () => {
+      const e = escenario();
+      const r = await api(`/api/escuelas?fenomeno=${e.fenomeno}&mes=${e.mes}&estado=todas&limite=8&buscar=${encodeURIComponent(q)}`).catch(() => null);
+      if (!r) return;
+      const filas = r.datos.map((d) => Object.fromEntries(r.columnas.map((c, i) => [c, d[i]])));
+      st.esc.encontradas = filas;
+      $('#escResultados').innerHTML = filas.length
+        ? filas.map((f, i) => `<li><button type="button" data-esc-ir="${i}"><span class="${PE.claseMarcador(f)}" aria-hidden="true"></span><span><b>${esc(f.nombre)}</b><small>${esc(f.cct || f.id)} · ${esc(f.nivel || '')} · ${esc(f.localidad)}, ${esc(f.municipio)}</small></span></button></li>`).join('')
+        : '<li class="nota">Sin resultados.</li>';
+    }, 250);
+  });
+  $('#escResultados').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-esc-ir]');
+    if (!b) return;
+    const f = st.esc.encontradas[Number(b.dataset.escIr)];
+    st.esc.extra = f; // se dibuja aunque el filtro no la incluya
+    if (!$('#capaEscuelas').checked) { $('#capaEscuelas').checked = true; mostrarCapas(st.sec); }
+    mapa.setView([f.lat, f.lon], Math.max(16, PE.ZOOM_INDIVIDUAL));
+    setTimeout(() => { pintarEscuelas(); abrirFichaEscuela(f); }, 200);
+  });
+  $('#capaEscuelas').addEventListener('change', () => { mostrarCapas(st.sec); if ($('#capaEscuelas').checked) pintarEscuelas(); });
+
+  // Bloque de la leyenda: una línea por señal.
+  const leyendaEscuelas = () => `<div class="ley-esc">
+      <div><b>Escuelas</b> · relleno = estado: <span><i class="esc-m esc-rojo"></i>afectada grave o inhabitable</span><span><i class="esc-m esc-naranja"></i>afectada leve o moderada</span><span><i class="esc-m esc-amarillo"></i>en peligro</span><span><i class="esc-m esc-gris"></i>sin riesgo alto</span></div>
+      <div><span><i class="esc-m esc-gris esc-verificar"></i>Borde punteado = daño por verificar</span></div>
+      <div><span><i class="esc-m esc-gris esc-dudosa"></i>Cuadro hueco = ubicación dudosa (aproximada o compartida)</span></div>
+    </div>`;
 
   // ---------- Contar población (geocerca) ----------
   function centro(g) {
@@ -603,6 +865,8 @@
     const enReportes = st.sec === 'reportes';
     const letra = { reporte: 'R', albergue: 'A', base: 'B', escuela: 'E' };
     for (const c of st.conf) {
+      // Los daños en escuelas ya se ven en la capa de escuelas (cuadro de color); fuera de Reportes no se repiten.
+      if (c.tipo === 'escuela' && !enReportes) continue;
       const color = COLOR_TIPO[c.tipo] || '#555';
       const popup = `<strong>${esc(c.nombre)}</strong><br>${NOM_TIPO[c.tipo] || ''} · ${c.fuente === 'lora' ? 'Red ESP32' : esc(c.fuente)}<br>${sinPersonas(c) ? '' : `${fmt(c.personas)} personas${c.capacidad ? ` de ${fmt(c.capacidad)}` : ''}<br>`}${c.necesidades.length ? `Insumos: ${esc(c.necesidades.map((n) => NOM_NEC[n] || n).join(', '))}<br>` : ''}${c.nota ? `<small>${esc(c.nota)}</small>` : ''}`;
       const icono = L.divIcon({ className: 'pinRep', html: `<span style="background:${color}">${letra[c.tipo] || '•'}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
@@ -1617,6 +1881,8 @@
   // ---------- Escenario ----------
   async function recargarEscenario() {
     notaMes();
+    mapa.closePopup();
+    cargarEscuelas(); // en paralelo con las localidades: el mapa y sus cifras cambian juntos
     await cargarLocalidades();
     await calcular();
     if (st.sec === 'riesgo' || st.sec === 'inicio') cargarResumen().then(pintarRiesgo).catch(() => {});
@@ -1645,6 +1911,23 @@
       await cargarLocalidades();
       await cargarConfirmaciones();
       irA(location.hash.slice(1) || 'inicio');
+      // Vista desde la dirección (?lat=19.05&lon=-98.2&z=13), para compartir un enlace.
+      const qs = new URLSearchParams(location.search);
+      if ([qs.get('lat'), qs.get('lon')].every((v) => v !== null && Number.isFinite(Number(v)))) mapa.setView([Number(qs.get('lat')), Number(qs.get('lon'))], Math.min(18, Math.max(6, Number(qs.get('z')) || 12)));
+      await cargarEscuelas();
+      pintarLeyenda();
+      // Ficha de una escuela desde la dirección (?escuela=21DPR1273G).
+      if (qs.get('escuela') && hayEscuelas()) {
+        const e = escenario();
+        const r = await api(`/api/escuelas?fenomeno=${e.fenomeno}&mes=${e.mes}&estado=todas&limite=1&buscar=${encodeURIComponent(qs.get('escuela'))}`).catch(() => null);
+        if (r?.datos.length) {
+          const f = Object.fromEntries(r.columnas.map((c, i) => [c, r.datos[0][i]]));
+          st.esc.extra = f;
+          mapa.setView([f.lat, f.lon], Math.max(mapa.getZoom(), 15));
+          pintarEscuelas();
+          abrirFichaEscuela(f);
+        }
+      }
     } catch (err) {
       $('#estadoDatos').innerHTML = `<span class="chip mal">Servidor no disponible: ${esc(err.message)}</span>`;
     }
