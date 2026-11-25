@@ -150,15 +150,19 @@ También acepta otro CSV de la SEP con columnas `cct`, `nombre`, `latitud`, `lon
 |---|---|---|
 | `cct` | `cv_cct` | |
 | `nombre` | `c_nombre` | |
-| `tipo_ct` | `c_tipo` | Solo se usan `escuela` y `plantel (media superior)` |
-| `tipo_educativo`, `nivel`, `subnivel` | `tiponivelsub_c_servicion1`, `…2`, `…3` | Tal cual vienen (básica / primaria / general, etc.). Vacíos en `plantel (media superior)` |
+| `tipo_ct` | `c_tipo` | Solo `escuela`, `plantel (media superior)`, `asistencial` (albergues escolares) y `centros de apoyo a la educación inicial del conafe` |
+| `es_inmueble_escolar` | `c_tipo` | `false` en los centros CONAFE de inicial, que pueden funcionar en casas o espacios comunitarios: por defecto no salen en las obras del Tabulador, pero sí en el mapa y en los conteos de riesgo |
+| `nivel` | `tiponivelsub_c_servicion2` agrupado | Uno de: inicial, preescolar, primaria, secundaria, media superior, superior, especial (CAM), formación para el trabajo. Si viene vacío y el tipo de centro lo dice, se toma de `c_tipo` (`plantel (media superior)` → media superior; CONAFE → inicial). Los albergues escolares quedan sin nivel |
+| `nivel_origen` | | `servicion` o `c_tipo` (o `nivel`/`nombre_act` en otros CSV) |
+| `servicion1`, `servicion2`, `servicion3` | `tiponivelsub_c_servicion1`, `…2`, `…3` | Valores originales (básica / primaria / general, etc.) |
 | `sostenimiento`, `subcontrol` | `sostenimiento_c_control`, `sostenimiento_c_subcontrol` | Público o Privado; Federal, Estatal, Autónomo, etc. |
 | `municipio`, `localidad`, `ambito` | `inmueble_c_nom_mun`, `inmueble_c_nom_loc`, `inmueble_c_nom_ambito` | Ámbito: urbano o rural |
 | `domicilio` | vialidad + número exterior + asentamiento + código postal | El 0 en número o CP no se escribe |
 | `lat`, `lon` | `inmueble_latitud`, `inmueble_longitud` | Decimal |
 | `turnos` | `c_turno_01`, `c_turno_02`, `c_turno_03` | Lista sin el número ni “sin dato”: `["matutino", "vespertino"]` |
+| `turnos_inactivos` | los mismos | Turnos marcados “(inactivo)”, sin esa marca |
 | `alumnos` | — | **El CNCT no trae alumnos: queda vacío** |
-| `fuente`, `decimales_coord` | | Ver abajo |
+| `fuente`, `decimales_coord`, `ubicacion_aproximada` | | Ver abajo |
 
 “Sin Dato” o “sin dato” se guarda como vacío.
 
@@ -167,7 +171,7 @@ También acepta otro CSV de la SEP con columnas `cct`, `nombre`, `latitud`, `lon
 Cada descarte se cuenta aparte, con su renglón, su CCT y el motivo.
 
 1. **Entidad Puebla.** En el CNCT, por `inmueble_c_nom_ent` = “Puebla” (sin importar mayúsculas ni acentos). En otros archivos, por la clave de entidad (`cve_ent` = 21) o, si no la traen, por el inicio `21` de la CCT. En el CNCT el `21` de la CCT es solo una **revisión**: las de Puebla cuya CCT no empieza con 21 se cuentan aparte, pero no se descartan.
-2. **Solo planteles.** En el CNCT, `c_tipo` debe ser `escuela` o `plantel (media superior)`. Los demás (administrativo, supervisión, biblioteca, rectoría, centros de apoyo del CONAFE, asistencial, etc.) se descartan y se cuentan por valor. En el DENUE, las actividades que no son escuelas.
+2. **Solo planteles.** En el CNCT, `c_tipo` debe ser `escuela`, `plantel (media superior)`, `asistencial` o `centros de apoyo a la educación inicial del conafe`. Los demás (administrativo, supervisión, biblioteca, rectoría, etc.) se descartan y se cuentan por valor. Rectoría queda fuera porque la universidad ya aparece como `escuela`. En el DENUE, las actividades que no son escuelas.
 3. **CCT con formato válido** (2 dígitos + 3 letras + 4 dígitos + letra).
 4. **Coordenadas:** vacías, en 0 o fuera del rectángulo que contiene al estado (latitud 17.8 a 20.9, longitud −99.1 a −96.7).
 
@@ -183,6 +187,8 @@ Dice qué tan fino está **escrita** la coordenada en el archivo, no si la escue
 | `media` | 3 (o segundos enteros) | ≈ 110 m |
 | `baja` | 2 o menos | ≈ 1 km o más |
 
+Las escuelas con `decimales_coord = baja` llevan `ubicacion_aproximada = true` y el mapa las dibuja con borde punteado.
+
 ## ESP32 y LoRa
 
 - `firmware/nodo-albergue/`: ESP32 con botones +1/−1/enviar. `MODO_WIFI` manda la trama directo a NEXO (se puede simular en Wokwi); `MODO_LORA` la manda por radio a 915 MHz.
@@ -195,7 +201,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 79 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 11 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 80 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 12 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 

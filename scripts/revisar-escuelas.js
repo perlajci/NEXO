@@ -52,14 +52,20 @@ const contar = (f) => { const m = {}; for (const e of r.escuelas) { const v = f(
 const tipos = { ...Object.fromEntries(Object.entries(s.tiposDescartados).map(([t, k]) => [`${t}  [descartado]`, k])) };
 for (const [t, k] of Object.entries(contar((e) => e.tipo_ct))) if (t) tipos[`${t}  [plantel]`] = k;
 if (Object.keys(tipos).length) tabla(`c_tipo en Puebla (planteles: ${TIPOS_PLANTEL.join(', ')})`, tipos);
-tabla('tiponivelsub_c_servicion1 (tipo educativo) en los planteles', contar((e) => e.tipo_educativo));
-tabla('tiponivelsub_c_servicion2 (nivel) en los planteles', contar((e) => e.nivel));
-tabla('tiponivelsub_c_servicion3 (subnivel) en los planteles', contar((e) => e.subnivel));
-tabla('Combinaciones c_tipo | servicion1 / servicion2', contar((e) => `${e.tipo_ct} | ${e.tipo_educativo || '(vacío)'} / ${e.nivel || '(vacío)'}`));
+tabla('servicion1 (original) en los planteles', contar((e) => e.servicion1));
+tabla('servicion2 (original) en los planteles', contar((e) => e.servicion2));
+tabla('servicion3 (original) en los planteles', contar((e) => e.servicion3));
+tabla('Nivel agrupado', contar((e) => e.nivel));
+tabla('Nivel agrupado y de dónde salió (nivel_origen)', contar((e) => `${e.nivel || '(vacío)'} ← ${e.nivel_origen || '(sin origen)'}`));
+tabla('c_tipo → nivel agrupado', contar((e) => `${e.tipo_ct} → ${e.nivel || '(vacío)'}`));
+tabla('es_inmueble_escolar', contar((e) => String(e.es_inmueble_escolar)));
 tabla('Turnos', contar((e) => e.turnos.join(' + ') || '(sin turno)'));
+tabla('Turnos inactivos', Object.fromEntries(Object.entries(contar((e) => e.turnos_inactivos.join(' + '))).filter(([k]) => k)));
 tabla('Sostenimiento / subcontrol', contar((e) => `${e.sostenimiento || '(vacío)'} / ${e.subcontrol || '(vacío)'}`));
 tabla('Ámbito', contar((e) => e.ambito));
 tabla('decimales_coord', contar((e) => e.decimales_coord));
+console.log(`
+ubicacion_aproximada = true: ${n(r.escuelas.filter((e) => e.ubicacion_aproximada).length)}`);
 const alumnos = r.escuelas.filter((e) => e.alumnos !== null);
 console.log(`\nCon dato de alumnos: ${n(alumnos.length)} de ${n(r.escuelas.length)} escuelas`);
 console.log(`Sin domicilio: ${n(r.escuelas.filter((e) => !e.domicilio).length)} · ejemplos:`);
