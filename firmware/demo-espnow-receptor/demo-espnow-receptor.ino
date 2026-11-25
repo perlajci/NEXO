@@ -14,8 +14,41 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 
-const uint8_t CANAL_WIFI = 1;  // ¡Debe coincidir exactamente con el ESP32 #1!
-const int     LED_PIN    = 2;
+const uint8_t CANAL_WIFI    = 1;      // ¡Debe coincidir exactamente con el ESP32 #1!
+const int     LED_PIN       = 2;      // LED azul integrado en la placa
+const int     LED_EXT_PIN   = 25;     // LED externo de alerta (con resistencia 220-330 ohm a GND)
+const int     BUZZER_PIN    = 26;     // Buzzer (+ a GPIO 26, - a GND)
+const bool    BUZZER_ACTIVO = false;  // false = buzzer PASIVO (recomendado), true = buzzer ACTIVO
+
+uint8_t MAC_BROADCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+void fijarLed(bool encendido) {
+  digitalWrite(LED_PIN, encendido ? HIGH : LOW);
+  digitalWrite(LED_EXT_PIN, encendido ? HIGH : LOW);
+}
+
+void sonar(int freqHz, int duracionMs) {
+  if (BUZZER_ACTIVO) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(duracionMs);
+    digitalWrite(BUZZER_PIN, LOW);
+  } else {
+    tone(BUZZER_PIN, freqHz, duracionMs);
+    delay(duracionMs);
+    noTone(BUZZER_PIN);
+  }
+}
+
+void alertaRecepcion() {
+  // 3 pitidos claros de alerta + LED parpadeando y encendido 1.5 s al final
+  for (int i = 0; i < 3; i++) {
+    fijarLed(true);
+    sonar(2200, 130);
+    fijarLed(false);
+    delay(80);
+  }
+  fijarLed(true);
+}
 
 // Cola circular segura para sacar la impresión del callback de Wi-Fi hacia loop()
 const int MAX_COLA = 8;
@@ -57,12 +90,16 @@ bool tramaValida(const String& t) {
 }
 
 unsigned long ultimoLatido = 0;
+unsigned long ledApagarEn  = 0;
 
 void setup() {
   Serial.begin(115200);
   delay(300);
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  pinMode(LED_EXT_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  fijarLed(false);
+  digitalWrite(BUZZER_PIN, LOW);
 
   // Modo estación sin ahorro de energía y bloqueado exactamente en CANAL_WIFI
   WiFi.persistent(false);
@@ -88,11 +125,28 @@ void setup() {
     while (true) delay(1000);
   }
   esp_now_register_recv_cb(alRecibir);
-  for (int i = 0; i < 3; i++) { digitalWrite(LED_PIN, HIGH); delay(80); digitalWrite(LED_PIN, LOW); delay(80); }
+
+  // Peer broadcast para devolver "ACK" de confirmación al ESP32 #1
+  esp_now_peer_info_t peer = {};
+  memcpy(peer.peer_addr, MAC_BROADCAST, 6);
+  peer.channel = CANAL_WIFI;
+  peer.ifidx   = WIFI_IF_STA;
+  peer.encrypt = false;
+  esp_now_add_peer(&peer);
+
+  // Prueba rápida de arranque: LED + 1 pitido corto
+  fijarLed(true);
+  sonar(1800, 80);
+  fijarLed(false);
+  for (int i = 0; i < 2; i++) { fijarLed(true); delay(80); fijarLed(false); delay(80); }
   Serial.println("Escuchando reportes de albergues por ESP-NOW...");
 }
 
 void loop() {
+  if (ledApagarEn > 0 && millis() >= ledApagarEn) {
+    ledApagarEn = 0;
+    fijarLed(false);
+  }
   if (millis() - ultimoLatido > 8000) {
     ultimoLatido = millis();
     uint8_t chReal = 0; wifi_second_chan_t ch2;
@@ -106,14 +160,17 @@ void loop() {
     t.trim();
 
     if (tramaValida(t)) {
-      digitalWrite(LED_PIN, HIGH);
+      // 1. Devolver confirmación (ACK) inmediata al ESP32 #1
+      esp_now_send(MAC_BROADCAST, (const uint8_t*)"ACK", 3);
+      // 2. Pasar la trama por USB a NEXO
       Serial.print("TRAMA|");
       Serial.print(rssi);
       Serial.print("|");
       Serial.println(t);
-      delay(80);
-      digitalWrite(LED_PIN, LOW);
-    } else {
+      // 3. Alerta visual y sonora en Protección Civil
+      alertaRecepcion();
+      ledApagarEn = millis() + 2000;
+    } else if (t != "ACK") {
       Serial.print("[Ignorado] ");
       Serial.println(t);
     }
