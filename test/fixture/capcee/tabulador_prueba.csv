@@ -1,0 +1,9 @@
+﻿clave_ref,concepto,unidad,precio_unitario_mxn_sin_iva,capitulo,partida_generica_conac,partida_especifica_cogape,factor_regional,tipo_dato,fuente
+PRUEBA-001,"Aula de prueba, con coma en el concepto",m2,1000,6000,612 Edificación no habitacional,61201 Prueba,1.0,OFICIAL CAPCEE,DATOS DE PRUEBA (inventados solo para probar el código)
+PRUEBA-002,Rehabilitación de prueba,m2,500.50,6000,612 Edificación no habitacional,,1.10,REFERENCIA PÚBLICA,DATOS DE PRUEBA (inventados solo para probar el código)
+PRUEBA-003,Pupitre de prueba,pza,200,5000,511 Muebles de oficina y estantería,,,ESTIMADO,DATOS DE PRUEBA (inventados solo para probar el código)
+PRUEBA-004,Supervisión de prueba como porcentaje,%,5,6000,612 Edificación no habitacional,,1.0,estimado,DATOS DE PRUEBA (inventados solo para probar el código)
+PRUEBA-005,Precio cero no válido,m2,0,6000,612 Edificación no habitacional,,1.0,ESTIMADO,DATOS DE PRUEBA (fila inválida a propósito)
+PRUEBA-006,Unidad no válida,kg,10,2000,246 Material eléctrico,,1.0,ESTIMADO,DATOS DE PRUEBA (fila inválida a propósito)
+PRUEBA-001,Clave repetida,m2,10,6000,612 Edificación no habitacional,,1.0,ESTIMADO,DATOS DE PRUEBA (fila inválida a propósito)
+PRUEBA-007,Tipo no válido,m,10,6000,612 Edificación no habitacional,,1.0,INVENTADO,DATOS DE PRUEBA (fila inválida a propósito)

@@ -15,12 +15,14 @@ import { crearFuentes } from './lib/fuentes.js';
 import { sugerirAlbergues } from './lib/albergues.js';
 import { calcularRuta } from './lib/rutas.js';
 import { parsearTrama } from './lib/trama.js';
+import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DATO, UNIDADES } from './lib/tabulador.js';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.NEXO_DATA || path.join(DIR, 'data');
 const PUERTO = Number(process.env.PORT || 3000);
 const fuentes = crearFuentes(path.join(DATA, 'cache'));
 const ARCHIVO_CONF = path.join(DATA, 'confirmaciones.json');
+const ARCHIVO_TAB = path.join(DATA, 'capcee', 'tabulador.csv');
 
 const estado = {
   iter: null, componentesV: [], sismos: null, sismoInfo: null, clima: null, maximos: null,
@@ -89,6 +91,23 @@ function validarConfirmacion(b) {
     nota: texto(b.nota, 240),
   };
 }
+
+// ---------- Tabulador CAPCEE ----------
+// Se vuelve a leer solo si el archivo cambió (o apareció/desapareció), así un CSV nuevo se ve sin reiniciar.
+let tabCache = { marca: null, datos: null };
+function tabulador() {
+  let marca = 'sin-archivo';
+  try { const s = fs.statSync(ARCHIVO_TAB); marca = `${s.mtimeMs}-${s.size}`; } catch { /* no existe */ }
+  if (tabCache.marca !== marca) tabCache = { marca, datos: leerTabulador(ARCHIVO_TAB) };
+  return tabCache.datos;
+}
+// Si el tabulador no se pudo leer, responde 409 con un aviso para mostrar en la sección.
+const requiereTabulador = (res) => {
+  const t = tabulador();
+  if (t.ok) return null;
+  enviar(res, 409, { error: t.error, ayuda: t.ayuda });
+  return true;
+};
 
 // ---------- Cálculos ----------
 function riesgoDe(l, fenomeno, mes) {
@@ -431,6 +450,24 @@ async function api(req, res, url) {
     const nueva = lista.filter((c) => c.id !== id);
     guardarConfirmaciones(nueva);
     return enviar(res, nueva.length < lista.length ? 200 : 404, { ok: nueva.length < lista.length });
+  }
+
+  // Catálogo filtrado: ?buscar=&capitulo=&tipo=
+  if (ruta === '/api/tabulador' && req.method === 'GET') {
+    if (requiereTabulador(res)) return;
+    const t = tabulador();
+    const filtros = { buscar: (q.get('buscar') || '').slice(0, 100), capitulo: q.get('capitulo') || '', tipo: q.get('tipo') || '' };
+    const conceptos = filtrarTabulador(t.conceptos, filtros);
+    return enviar(res, 200, {
+      filtros, total: conceptos.length, totalCatalogo: t.conceptos.length, conceptos,
+      rechazados: t.rechazados, actualizado: t.actualizado,
+      catalogos: { capitulos: CAPITULOS, tipos: TIPOS_DATO, unidades: UNIDADES },
+    });
+  }
+  if (ruta === '/api/tabulador/resumen' && req.method === 'GET') {
+    if (requiereTabulador(res)) return;
+    const t = tabulador();
+    return enviar(res, 200, { ...resumenTabulador(t.conceptos), rechazados: t.rechazados.length, actualizado: t.actualizado });
   }
 
   if (ruta === '/api/preparar/clima' && req.method === 'POST') {
