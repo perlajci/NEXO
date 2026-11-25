@@ -21,6 +21,9 @@ import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, 
 import { crearAlmacenJSON } from './lib/almacen.js';
 import { cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA, NIVELES_ESCOLARES } from './lib/escuelas.js';
 import { prepararEscuelas, riesgoEscuela, riesgoPorFenomeno, enPeligro, filtrarEscuelas, resumenEscuelas } from './lib/riesgo-escuelas.js';
+import {
+  crearReporteEscuela, cambiarEstadoReporte, reportesDeEscuela, danoPorEscuela, normalizarDano, ErrorReporte, DANOS, NOMBRE_DANO, ORIGENES,
+} from './lib/reportes-escuelas.js';
 import { crearSesiones, esPublico, claveIgual, leerCookie, cookieSesion, COOKIE } from './lib/sesion.js';
 import {
   validarCSV, compararTabuladores, reemplazarTabulador, listarHistorial, claveCorrecta, RE_RESPALDO, LIMITE_BYTES,
@@ -86,10 +89,12 @@ async function cargarClima({ descargar = false } = {}) {
 function leerConfirmaciones() {
   try { return JSON.parse(fs.readFileSync(ARCHIVO_CONF, 'utf8')); } catch { return []; }
 }
-function guardarConfirmaciones(lista) { fs.writeFileSync(ARCHIVO_CONF, JSON.stringify(lista, null, 1)); }
+let versionReportes = 0;
+function guardarConfirmaciones(lista) { fs.writeFileSync(ARCHIVO_CONF, JSON.stringify(lista, null, 1)); versionReportes++; }
 const NECESIDADES = ['agua', 'alimentos', 'medicinas', 'atencion_medica', 'cobijas', 'traslado', 'energia', 'comunicacion'];
 
 function validarConfirmacion(b) {
+  if (b.tipo === 'escuela') throw new Error('Los reportes de daño en escuelas se registran en /api/escuelas/:cct/reportes');
   const lat = Number(b.lat);
   const lon = Number(b.lon);
   const personas = Math.round(Number(b.personas));
@@ -195,40 +200,69 @@ function puntosEscuelas() {
   }
   return escPrep.puntos;
 }
-// Escuelas afectadas por id (reporte de daño leve o mayor). Se llena en el paso 3 con los reportes.
-const afectadasPorId = () => new Map();
+// ---------- Reportes de daño en escuelas (lib/reportes-escuelas.js) ----------
+// Se guardan en data/confirmaciones.json con tipo "escuela". Un reporte se aplica a todas las CCT
+// del mismo inmueble; el daño de cada escuela es el más grave verificado (o "por verificar").
+const reportesEscuela = () => leerConfirmaciones().filter((c) => c.tipo === 'escuela');
+let danoCache = { version: -1, escuelas: null, mapa: new Map() };
+function danoEscuelas() {
+  const d = escuelas();
+  if (danoCache.version !== versionReportes || danoCache.escuelas !== d) {
+    danoCache = { version: versionReportes, escuelas: d, mapa: d ? danoPorEscuela(d.escuelas, reportesEscuela()) : new Map() };
+  }
+  return danoCache.mapa;
+}
+function buscarEscuela(id) {
+  const clave = String(id || '').trim().toUpperCase();
+  return escuelas()?.escuelas.find((e) => e.id.toUpperCase() === clave || e.cct === clave) || null;
+}
+function reportesAplicables(e) {
+  const inm = new Map((escuelas()?.escuelas || []).map((x) => [x.id, x.inmueble_id]));
+  return reportesDeEscuela(e, reportesEscuela(), (r) => inm.get(r.escuela_id));
+}
+// Historial de la escuela: altas y cambios de estado de sus reportes, del más reciente al más viejo.
+const historialDe = (reportes) => reportes
+  .flatMap((r) => (r.historial || []).map((h) => ({ ...h, reporteId: r.id, deCct: r.deCct, dano: h.dano || r.dano })))
+  .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
 // Filas con riesgo y estado para un fenómeno y mes (se guardan las últimas combinaciones pedidas).
 const escFilas = new Map();
+let escFilasVersion = -1;
 function filasEscuelas(fenomeno, mes) {
   const puntos = puntosEscuelas();
   if (!puntos) return null;
+  if (escFilasVersion !== versionReportes) { escFilas.clear(); escFilasVersion = versionReportes; }
   const k = `${fenomeno}-${mes}`;
   if (!escFilas.has(k)) {
     if (escFilas.size > 24) escFilas.clear();
-    const afectadas = afectadasPorId();
+    const danos = danoEscuelas();
     escFilas.set(k, puntos.map((pt) => {
       const riesgo = riesgoEscuela(pt, fenomeno, mes, estado.maximos);
-      return { ...pt, riesgo, enPeligro: enPeligro(riesgo.nivel), afectada: afectadas.has(pt.e.id), dano: afectadas.get(pt.e.id) || null };
+      const dano = danos.get(pt.e.id) || null;
+      return { ...pt, riesgo, enPeligro: enPeligro(riesgo.nivel), afectada: !!dano?.afectada, dano };
     }));
   }
   return escFilas.get(k);
 }
-const requiereEscuelas = (res) => {
-  if (requiereITER(res)) return true;
+const requiereCatalogoEscuelas = (res) => {
   if (escuelas()?.escuelas.length) return false;
   enviar(res, 409, { error: 'No hay escuelas cargadas.', ayuda: estadoEscuelas().aviso });
   return true;
 };
+const requiereEscuelas = (res) => requiereITER(res) || requiereCatalogoEscuelas(res);
 const COLUMNAS_ESCUELAS = ['id', 'cct', 'nombre', 'nivel', 'tipo_ct', 'es_inmueble_escolar', 'municipio', 'mun', 'localidad', 'lat', 'lon', 'alumnos',
-  'ubicacion_aproximada', 'P', 'V', 'R', 'riesgo', 'enPeligro', 'afectada', 'distLocKm'];
+  'ubicacion_aproximada', 'P', 'V', 'R', 'riesgo', 'enPeligro', 'afectada', 'distLocKm', 'vulnerabilidad_referencial', 'inmueble_id',
+  'dano', 'danoVerificado', 'danoDeCct'];
 const filaEscuela = (f) => [f.e.id, f.e.cct, f.e.nombre, f.e.nivel, f.e.tipo_ct, f.e.es_inmueble_escolar, f.e.municipio, f.mun, f.e.localidad,
-  f.e.lat, f.e.lon, f.e.alumnos, f.e.ubicacion_aproximada, f.riesgo.p, f.riesgo.V, f.riesgo.r, f.riesgo.nivel, f.enPeligro, f.afectada, f.distLocKm];
+  f.e.lat, f.e.lon, f.e.alumnos, f.e.ubicacion_aproximada, f.riesgo.p, f.riesgo.V, f.riesgo.r, f.riesgo.nivel, f.enPeligro, f.afectada, f.distLocKm, f.vulnerabilidadReferencial, f.e.inmueble_id,
+  f.dano?.dano ?? null, f.dano ? f.dano.verificado : null, f.dano?.deCct ?? null];
 
 function fichaEscuela(id, fenomeno, mes) {
   const filas = filasEscuelas(fenomeno, mes);
   const clave = String(id).trim().toUpperCase();
   const f = filas.find((x) => x.e.id.toUpperCase() === clave || x.e.cct === clave);
   if (!f) return null;
+  const reportes = reportesAplicables(f.e);
   // Población en 2 km: localidades del censo cuyo punto cae dentro del círculo.
   const g = validarGeocerca({ tipo: 'circulo', centro: [f.lat, f.lon], radioKm: 2 });
   const cerca = estado.iter.localidades.filter((l) => Math.abs(l.lat - f.lat) < 0.03 && Math.abs(l.lon - f.lon) < 0.03 && contiene(g, l.lat, l.lon));
@@ -239,6 +273,14 @@ function fichaEscuela(id, fenomeno, mes) {
     escuela: f.e,
     mun: f.mun,
     localidadCercana: f.loc ? { id: f.loc.id, nom: f.loc.nom, nomMun: f.loc.nomMun, distanciaKm: f.distLocKm, V: f.loc.V, POBTOT: f.loc.POBTOT } : null,
+    vulnerabilidad_referencial: f.vulnerabilidadReferencial,
+    avisos: [
+      ...(f.vulnerabilidadReferencial ? [`La localidad del censo más cercana está a ${f.distLocKm} km: la vulnerabilidad es solo referencial.`] : []),
+      ...(f.e.ubicacion_aproximada ? ['La coordenada de esta escuela es aproximada (2 decimales o menos, ≈1 km).'] : []),
+      ...(f.e.coordenada_compartida ? [`Otras ${f.e.coordenada_compartida} CCT con otro domicilio usan esta misma coordenada: puede ser un punto genérico.`] : []),
+      ...(f.dano?.porVerificar ? ['El daño reportado está por verificar.'] : []),
+    ],
+    mismoInmueble: filas.filter((x) => x.e.inmueble_id === f.e.inmueble_id && x !== f).map((x) => ({ id: x.e.id, cct: x.e.cct, nombre: x.e.nombre, nivel: x.e.nivel })),
     fenomeno, mes,
     riesgo: f.riesgo,
     enPeligro: f.enPeligro,
@@ -246,8 +288,9 @@ function fichaEscuela(id, fenomeno, mes) {
     riesgoPorFenomeno: riesgoPorFenomeno(f, mes, estado.maximos),
     poblacion2km: { radioKm: 2, ...agregar(cerca), nota: 'Suma las localidades del censo cuyo punto está a 2 km o menos de la escuela.' },
     albergueCercano: albergues[0] || null,
-    reportes: [], // paso 3
-    historial: [], // paso 3
+    dano: f.dano,
+    reportes,
+    historial: historialDe(reportes),
   };
 }
 
@@ -288,7 +331,7 @@ function resumenGeocerca(geocerca, fenomeno, mes, filtros) {
     const m = (municipios[l.mun] ||= { mun: l.mun, nombre: l.nomMun, poblacion: 0, localidades: 0 });
     m.poblacion += l.POBTOT || 0; m.localidades++;
   }
-  const conf = leerConfirmaciones().filter((c) => c.tipo !== 'base' && contiene(geocerca, c.lat, c.lon));
+  const conf = leerConfirmaciones().filter((c) => c.tipo !== 'base' && c.tipo !== 'escuela' && contiene(geocerca, c.lat, c.lon));
   const confirmados = conf.reduce((a, c) => a + c.personas, 0);
   const necesidades = {};
   for (const c of conf) for (const n of c.necesidades) necesidades[n] = (necesidades[n] || 0) + 1;
@@ -571,12 +614,26 @@ async function api(req, res, url) {
       ...p, fuente: 'lora',
       nota: p.nota ? `${p.nota} · ${meta}` : meta,
     });
+    // Campo opcional de escuela: liga el reporte a una CCT y, si trae daño, crea el reporte de daño.
+    let reporteEscuela = null;
+    if (p.cct) {
+      const esc = buscarEscuela(p.cct);
+      c.cct = p.cct;
+      if (!esc) c.nota = `${c.nota} · CCT ${p.cct} no está en el catálogo`;
+      else if (p.dano) {
+        const dano = normalizarDano(p.dano);
+        if (!dano) c.nota = `${c.nota} · daño "${p.dano}" no reconocido`;
+        else reporteEscuela = crearReporteEscuela({ dano, descripcion: p.nota || '', origen: via }, esc);
+      }
+    }
     const lista = leerConfirmaciones();
     // Un albergue o base actualiza su estado por nombre; los reportes de emergencia se agregan como entradas nuevas.
     const i = c.tipo === 'reporte' ? -1 : lista.findIndex((x) => x.fuente === 'lora' && x.nombre === c.nombre && x.tipo === c.tipo);
     if (i >= 0) lista[i] = { ...c, id: lista[i].id }; else lista.push(c);
+    if (reporteEscuela) lista.push(reporteEscuela);
     guardarConfirmaciones(lista);
-    return enviar(res, i >= 0 ? 200 : 201, i >= 0 ? lista[i] : c);
+    const salida = i >= 0 ? lista[i] : c;
+    return enviar(res, i >= 0 ? 200 : 201, reporteEscuela ? { ...salida, reporteEscuela } : salida);
   }
 
   if (ruta === '/api/confirmaciones' && req.method === 'GET') return enviar(res, 200, leerConfirmaciones());
@@ -748,6 +805,43 @@ async function api(req, res, url) {
   if (ruta === '/api/escuelas/resumen' && req.method === 'GET') {
     if (requiereEscuelas(res)) return;
     return enviar(res, 200, { fenomeno, mes, ...resumenEscuelas(filasEscuelas(fenomeno, mes)) });
+  }
+  // Reportes de daño: GET/POST /api/escuelas/:cct/reportes · PATCH /api/escuelas/:cct/reportes/:id {estado, nota}
+  const mr = ruta.match(/^\/api\/escuelas\/([^/]{1,40})\/reportes(?:\/([\w-]{1,64}))?$/);
+  if (mr) {
+    if (requiereCatalogoEscuelas(res)) return;
+    const esc = buscarEscuela(decodeURIComponent(mr[1]));
+    if (!esc) return enviar(res, 404, { error: 'Escuela no encontrada' });
+    if (!mr[2] && req.method === 'GET') {
+      const reportes = reportesAplicables(esc);
+      const dano = danoEscuelas().get(esc.id) || null;
+      return enviar(res, 200, { escuela: { id: esc.id, cct: esc.cct, nombre: esc.nombre, inmueble_id: esc.inmueble_id }, dano, reportes, historial: historialDe(reportes), catalogos: { danos: DANOS, nombres: NOMBRE_DANO, origenes: ORIGENES } });
+    }
+    if (!mr[2] && req.method === 'POST') {
+      let r;
+      try { r = crearReporteEscuela(await leerCuerpo(req), esc); } catch (e) {
+        if (e instanceof ErrorReporte) return enviar(res, 400, { error: e.message });
+        throw e;
+      }
+      const lista = leerConfirmaciones();
+      lista.push(r);
+      guardarConfirmaciones(lista);
+      return enviar(res, 201, r);
+    }
+    if (mr[2] && req.method === 'PATCH') {
+      const b = await leerCuerpo(req);
+      const lista = leerConfirmaciones();
+      const i = lista.findIndex((x) => x.id === mr[2] && x.tipo === 'escuela');
+      if (i < 0) return enviar(res, 404, { error: 'Reporte no encontrado' });
+      if (!reportesAplicables(esc).some((x) => x.id === mr[2])) return enviar(res, 404, { error: 'Ese reporte no es de esta escuela ni de su inmueble' });
+      try { lista[i] = cambiarEstadoReporte(lista[i], b.estado, { nota: b.nota }); } catch (e) {
+        if (e instanceof ErrorReporte) return enviar(res, 400, { error: e.message });
+        throw e;
+      }
+      guardarConfirmaciones(lista);
+      return enviar(res, 200, lista[i]);
+    }
+    return enviar(res, 405, { error: 'Método no permitido' });
   }
   if (ruta.startsWith('/api/escuela/') && req.method === 'GET') {
     if (requiereEscuelas(res)) return;

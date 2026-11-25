@@ -34,8 +34,9 @@
   const NIV_ORDEN = ['muy_alto', 'alto', 'medio', 'bajo', 'sin_dato'];
   const NOM_NIV = { muy_alto: 'Muy alto', alto: 'Alto', medio: 'Medio', bajo: 'Bajo', sin_dato: 'Sin dato' };
   const NOM_NEC = { agua: 'Agua', alimentos: 'Alimentos', medicinas: 'Medicinas', atencion_medica: 'Atención médica', cobijas: 'Cobijas', traslado: 'Traslado', energia: 'Energía', comunicacion: 'Comunicación' };
-  const NOM_TIPO = { albergue: 'Albergue', base: 'Base', reporte: 'Reporte' };
-  const COLOR_TIPO = { albergue: '#2f8f5b', base: '#1f5fbf', reporte: '#e3742b' };
+  const NOM_TIPO = { albergue: 'Albergue', base: 'Base', reporte: 'Reporte', escuela: 'Daño en escuela' };
+  const COLOR_TIPO = { albergue: '#2f8f5b', base: '#1f5fbf', reporte: '#e3742b', escuela: '#b42318' };
+  const sinPersonas = (c) => c.tipo === 'base' || c.tipo === 'escuela'; // no llevan conteo de personas
   const etiquetaNivel = (n) => `<span class="nivel" style="background:${COLOR[n || 'sin_dato']}">${NOM_NIV[n || 'sin_dato']}</span>`;
 
   const api = async (ruta, opciones) => {
@@ -600,10 +601,10 @@
     capas.conf.clearLayers();
     marcadoresConf = new Map();
     const enReportes = st.sec === 'reportes';
-    const letra = { reporte: 'R', albergue: 'A', base: 'B' };
+    const letra = { reporte: 'R', albergue: 'A', base: 'B', escuela: 'E' };
     for (const c of st.conf) {
       const color = COLOR_TIPO[c.tipo] || '#555';
-      const popup = `<strong>${esc(c.nombre)}</strong><br>${NOM_TIPO[c.tipo] || ''} · ${c.fuente === 'lora' ? 'Red ESP32' : esc(c.fuente)}<br>${c.tipo === 'base' ? '' : `${fmt(c.personas)} personas${c.capacidad ? ` de ${fmt(c.capacidad)}` : ''}<br>`}${c.necesidades.length ? `Insumos: ${esc(c.necesidades.map((n) => NOM_NEC[n] || n).join(', '))}<br>` : ''}${c.nota ? `<small>${esc(c.nota)}</small>` : ''}`;
+      const popup = `<strong>${esc(c.nombre)}</strong><br>${NOM_TIPO[c.tipo] || ''} · ${c.fuente === 'lora' ? 'Red ESP32' : esc(c.fuente)}<br>${sinPersonas(c) ? '' : `${fmt(c.personas)} personas${c.capacidad ? ` de ${fmt(c.capacidad)}` : ''}<br>`}${c.necesidades.length ? `Insumos: ${esc(c.necesidades.map((n) => NOM_NEC[n] || n).join(', '))}<br>` : ''}${c.nota ? `<small>${esc(c.nota)}</small>` : ''}`;
       const icono = L.divIcon({ className: 'pinRep', html: `<span style="background:${color}">${letra[c.tipo] || '•'}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
       const m = L.marker([c.lat, c.lon], { icon: icono, zIndexOffset: 900 }).bindPopup(popup);
       if (enReportes) m.bindTooltip(esc(c.nombre), { permanent: true, direction: 'top', offset: [0, -14], className: 'etiqRep' });
@@ -614,7 +615,7 @@
   function pintarReportes() {
     const tot = st.conf.length;
     const esp = st.conf.filter((c) => c.fuente === 'lora').length;
-    const pers = st.conf.filter((c) => c.tipo !== 'base').reduce((a, c) => a + (c.personas || 0), 0);
+    const pers = st.conf.filter((c) => !sinPersonas(c)).reduce((a, c) => a + (c.personas || 0), 0);
     const ult = st.conf.length ? new Date(st.conf[st.conf.length - 1].fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '–';
     const badge = $('#badgeRep');
     if (badge) { badge.hidden = tot === 0; badge.textContent = String(tot); }
@@ -650,7 +651,7 @@
         </div>
         <div class="rep-meta">
           ${c.fuente === 'lora' ? '<span class="rep-badge esp">ESP32 · Sin internet</span>' : `<span class="rep-badge">${esc(c.fuente)}</span>`}
-          ${c.tipo === 'base' ? '' : `<strong>${fmt(c.personas)} personas${c.capacidad ? ` / ${fmt(c.capacidad)}` : ''}</strong>`}
+          ${sinPersonas(c) ? '' : `<strong>${fmt(c.personas)} personas${c.capacidad ? ` / ${fmt(c.capacidad)}` : ''}</strong>`}
           <span class="nota">${esc(new Date(c.fecha).toLocaleString('es-MX'))}</span>
         </div>
         ${c.necesidades?.length ? `<div class="rep-chips">${c.necesidades.map((n) => `<span>${esc(NOM_NEC[n] || n)}</span>`).join('')}</div>` : ''}
@@ -738,7 +739,7 @@
   function listaConfirmaciones() {
     const lista = st.conf.filter((c) => st.filtroConf === 'todos' || c.tipo === st.filtroConf).slice().reverse();
     $('#listaConf').innerHTML = lista.length
-      ? lista.map((c) => `<li><span><span class="etq" style="border-color:${COLOR_TIPO[c.tipo]}">${NOM_TIPO[c.tipo] || ''}</span><strong>${esc(c.nombre)}</strong>${c.tipo === 'base' ? '' : ` · ${fmt(c.personas)} personas${c.capacidad ? ` / ${fmt(c.capacidad)}` : ''}`} · ${esc(c.fuente)}<br><small class="nota">${esc(new Date(c.fecha).toLocaleString('es-MX'))}${c.nota ? ` · ${esc(c.nota)}` : ''}</small></span><button type="button" data-borrar="${esc(c.id)}">Quitar</button></li>`).join('')
+      ? lista.map((c) => `<li><span><span class="etq" style="border-color:${COLOR_TIPO[c.tipo]}">${NOM_TIPO[c.tipo] || ''}</span><strong>${esc(c.nombre)}</strong>${sinPersonas(c) ? '' : ` · ${fmt(c.personas)} personas${c.capacidad ? ` / ${fmt(c.capacidad)}` : ''}`} · ${esc(c.fuente)}<br><small class="nota">${esc(new Date(c.fecha).toLocaleString('es-MX'))}${c.nota ? ` · ${esc(c.nota)}` : ''}</small></span><button type="button" data-borrar="${esc(c.id)}">Quitar</button></li>`).join('')
       : '<li class="nota">Sin registros.</li>';
   }
   $$('[data-filtro]').forEach((b) => b.addEventListener('click', () => {

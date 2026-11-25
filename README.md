@@ -189,12 +189,21 @@ Dice qué tan fino está **escrita** la coordenada en el archivo, no si la escue
 
 Las escuelas con `decimales_coord = baja` llevan `ubicacion_aproximada = true` y el mapa las dibuja con borde punteado.
 
+### Inmueble (`inmueble_id`)
+
+Varias CCT pueden funcionar en el mismo edificio (turnos, niveles o servicios distintos). Comparten `inmueble_id` las escuelas con **la misma coordenada redondeada a 5 decimales y la misma calle** (lo que va antes de la primera coma del domicilio, sin el número exterior: “Calle 9 Sur 145” y “Calle 9 Sur” son la misma calle; “Calle 9 Sur” y “Calle 21 Poniente”, no).
+
+La calle se compara porque el catálogo repite coordenadas genéricas: en el centro de Puebla, una misma coordenada tiene 166 CCT con 118 domicilios distintos. `coordenada_compartida` dice cuántas CCT más usan esa coordenada con otra calle; la ficha lo avisa como posible punto genérico.
+
+- `/api/escuelas/resumen` cuenta escuelas y también inmuebles (“826 escuelas en peligro en 622 inmuebles”).
+- Un reporte de daño en una CCT se aplica a todas las CCT de su inmueble.
+
 ### Riesgo por escuela (`lib/riesgo-escuelas.js`)
 
 Mismo modelo que las localidades: **Riesgo = Peligro × (0.5 + 0.5 · V)**.
 
 - **Peligro, en el punto de la escuela:** volcánico por distancia al cráter; sísmico con los sismos alrededor de la escuela, normalizado con el máximo de las localidades del estado para que sea comparable; lluvias y heladas con la celda climática más cercana y el mes elegido.
-- **Vulnerabilidad (V):** la de la **localidad del censo más cercana**. La ficha muestra esa localidad y su distancia: si es grande, V es menos representativa. Si la localidad no tiene V (datos reservados), se usa 0.5, igual que en el mapa.
+- **Vulnerabilidad (V):** la de la **localidad del censo más cercana**. La ficha muestra esa localidad y su distancia. A más de 5 km, `vulnerabilidad_referencial = true` y la ficha avisa que V es solo referencial. Si la localidad no tiene V (datos reservados), se usa 0.5, igual que en el mapa.
 - **Municipio:** por el nombre que trae la escuela; si no coincide con el censo, el de la localidad más cercana.
 - Se recalcula al cambiar fenómeno o mes en el encabezado.
 
@@ -203,11 +212,20 @@ Mismo modelo que las localidades: **Riesgo = Peligro × (0.5 + 0.5 · V)**.
 - **En peligro:** nivel de riesgo alto o muy alto con el fenómeno y el mes elegidos. Es una **estimación del modelo**.
 - **Afectada:** escuela con al menos un reporte de daño leve o mayor. Es un **dato de campo**. Una escuela puede ser ambas cosas; afectada tiene prioridad visual.
 
+### Reportes de daño (`lib/reportes-escuelas.js`)
+
+Se guardan en `data/confirmaciones.json`, la misma capa que Operación, con tipo `escuela`. Cada reporte lleva: `cct`, `dano` (`sin_dano`, `leve`, `moderado`, `grave`, `inhabitable`), `descripcion`, `fecha_dano`, `origen` (`manual` desde la página, o `espnow`, `lora` o `wifi` desde un nodo ESP32), `estado` (`pendiente` o `verificado`) e `historial` (alta y cada cambio de estado).
+
+- **Mismo inmueble:** un reporte en una CCT se aplica a todas las CCT de su `inmueble_id`, indicando de qué CCT vino (`deCct`).
+- **Daño de la escuela:** el más grave entre los reportes **verificados**. Si solo hay pendientes, se toma el más grave de ellos y la escuela queda **por verificar**.
+- **Afectada:** daño leve o mayor, verificado o por verificar. “Sin daño” no cuenta.
+
 ## ESP32 y LoRa
 
 - `firmware/nodo-albergue/`: ESP32 con botones +1/−1/enviar. `MODO_WIFI` manda la trama directo a NEXO (se puede simular en Wokwi); `MODO_LORA` la manda por radio a 915 MHz.
 - `firmware/puerta-enlace/`: ESP32 con LoRa que recibe tramas y las sube a NEXO por WiFi, **sin Raspberry Pi**, con cola si se cae internet.
 - `POST /api/lora/trama` recibe `A|nombre|personas|capacidad|lat|lon|ag,me` y actualiza el registro del mismo albergue.
+- **Campo opcional de escuela** (posición 8, antes de la nota): `<CCT>` o `<CCT>:<daño>`, por ejemplo `R|Brigada 3|12||19.0412|-98.4123|me|21DPR1273G:gr|Techo caído`. Daño abreviado: `sd` sin daño, `le` leve, `mo` moderado, `gr` grave, `in` inhabitable. Con daño se crea un reporte de escuela **pendiente** con el origen del nodo (`via`: espnow, lora o wifi). Si el campo 8 no tiene forma de CCT se toma como nota, así que las tramas anteriores no cambian. Una CCT que no está en el catálogo se anota en el reporte y no crea daño.
 - Simulador sin placas: `npm run lora:simular -- "A|Alb Sec 12|85|150|19.04|-98.41|ag,me"`
 - Diseño completo, escalabilidad y materiales: [`docs/propuesta-lora.md`](docs/propuesta-lora.md).
 
@@ -215,7 +233,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 89 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js` y 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 97 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js`, 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js` y 8 de reportes de daño en `test/escuelas-reportes.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
@@ -246,7 +264,9 @@ Pruebas del tabulador (40):
 | GET | `/api/albergues/publicos` | Lista pública mínima para `cerca.html` |
 | GET | `/api/escuelas?fenomeno=&mes=&nivel=&mun=&estado=&buscar=&riesgo=&limite=` | Escuelas con peligro, vulnerabilidad, índice y nivel de riesgo, `enPeligro` y `afectada`, en columnas como `/api/localidades`. `nivel` = nivel educativo; `mun` = clave o nombre; `estado` = `peligro`, `afectada`, `peligro_afectada` o `todas`; `riesgo` = niveles de riesgo separados por coma. 409 con aviso si no hay escuelas |
 | GET | `/api/escuelas/resumen?fenomeno=&mes=` | Total, en peligro, afectadas, alumnos expuestos (`null` y aviso si el catálogo no trae alumnos) y desglose por municipio, nivel educativo y nivel de riesgo |
-| GET | `/api/escuela/:cct?fenomeno=&mes=` | Ficha: datos, localidad del censo más cercana y su distancia, riesgo con los cuatro fenómenos, población en 2 km, albergue más cercano, reportes e historial (también acepta `DENUE-<id>`) |
+| GET | `/api/escuela/:cct?fenomeno=&mes=` | Ficha: datos, localidad del censo más cercana y su distancia, avisos (vulnerabilidad referencial, coordenada aproximada o compartida, daño por verificar), CCT del mismo inmueble, riesgo con los cuatro fenómenos, población en 2 km, albergue más cercano, daño, reportes e historial (también acepta `DENUE-<id>`) |
+| GET/POST | `/api/escuelas/:cct/reportes` | Reportes que aplican a la escuela (los de todo su inmueble) y su daño; alta `{dano, descripcion, fecha, origen, estado}` (400 si el daño o la fecha no son válidos) |
+| PATCH | `/api/escuelas/:cct/reportes/:id` | `{estado: "verificado" \| "pendiente", nota}`; queda en el historial |
 | POST | `/api/lora/trama` | Trama de un nodo ESP32 |
 | GET/POST/DELETE | `/api/confirmaciones` | Albergues, bases y reportes |
 | GET | `/api/tabulador?buscar=&capitulo=&tipo=` | Conceptos del tabulador filtrados (409 con aviso si falta el CSV) |

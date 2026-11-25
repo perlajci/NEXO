@@ -33,6 +33,7 @@
 - **Quién tiene nodo:** cada albergue, cada brigada en campo y el puesto de mando. Las bases de respuesta (Protección Civil, Cruz Roja) pueden tener uno para recibir avisos.
 - **Formato de trama** (≤ 60 bytes con abreviaturas): `A|Alb Primaria Juarez|85|150|19.0412|-98.4123|ag,me`
   `A` albergue · `R` reporte de brigada · `B` base. Necesidades: `ag` agua, `al` alimentos, `me` medicinas, `am` atención médica, `co` cobijas, `tr` traslado, `en` energía, `cm` comunicación.
+  Campo opcional de escuela, antes de la nota: `R|Brigada 3|12||19.0412|-98.4123|me|21DPR1273G:gr|Techo caído` (`sd` sin daño, `le` leve, `mo` moderado, `gr` grave, `in` inhabitable). Crea un reporte de daño pendiente ligado a esa CCT.
 
 ## 4. ¿Se puede escalar a toda la población?
 
