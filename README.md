@@ -189,6 +189,20 @@ Dice qué tan fino está **escrita** la coordenada en el archivo, no si la escue
 
 Las escuelas con `decimales_coord = baja` llevan `ubicacion_aproximada = true` y el mapa las dibuja con borde punteado.
 
+### Riesgo por escuela (`lib/riesgo-escuelas.js`)
+
+Mismo modelo que las localidades: **Riesgo = Peligro × (0.5 + 0.5 · V)**.
+
+- **Peligro, en el punto de la escuela:** volcánico por distancia al cráter; sísmico con los sismos alrededor de la escuela, normalizado con el máximo de las localidades del estado para que sea comparable; lluvias y heladas con la celda climática más cercana y el mes elegido.
+- **Vulnerabilidad (V):** la de la **localidad del censo más cercana**. La ficha muestra esa localidad y su distancia: si es grande, V es menos representativa. Si la localidad no tiene V (datos reservados), se usa 0.5, igual que en el mapa.
+- **Municipio:** por el nombre que trae la escuela; si no coincide con el censo, el de la localidad más cercana.
+- Se recalcula al cambiar fenómeno o mes en el encabezado.
+
+**Definiciones** (iguales en toda la interfaz):
+
+- **En peligro:** nivel de riesgo alto o muy alto con el fenómeno y el mes elegidos. Es una **estimación del modelo**.
+- **Afectada:** escuela con al menos un reporte de daño leve o mayor. Es un **dato de campo**. Una escuela puede ser ambas cosas; afectada tiene prioridad visual.
+
 ## ESP32 y LoRa
 
 - `firmware/nodo-albergue/`: ESP32 con botones +1/−1/enviar. `MODO_WIFI` manda la trama directo a NEXO (se puede simular en Wokwi); `MODO_LORA` la manda por radio a 915 MHz.
@@ -201,7 +215,7 @@ Los bocetos de firmware **no se han compilado en placa real**: revísalos con el
 
 ## Pruebas
 
-`npm test` corre 80 pruebas (7 del inicio de sesión en `test/sesion.test.js` y 12 del lector de escuelas en `test/escuelas.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
+`npm test` corre 89 pruebas (7 del inicio de sesión en `test/sesion.test.js`, 12 del lector de escuelas en `test/escuelas.test.js` y 9 del riesgo y la API de escuelas en `test/escuelas-riesgo.test.js`): lector del censo, geocercas, índice de riesgo, Gutenberg-Richter, climatología, API completa, municipios, albergues sugeridos, rutas sin conexión, decodificador de polilíneas de Google, tramas y el tabulador. Usan `test/fixture/iter/iter_prueba.csv`, `test/fixture/capcee/tabulador_prueba.csv` y `test/fixture/escuelas/`, con **cifras, precios, escuelas y CCT (`21ZZZ…`) inventados** solo para probar el código.
 
 Pruebas del tabulador (40):
 
@@ -230,6 +244,9 @@ Pruebas del tabulador (40):
 | GET | `/api/ruta?origen=lat,lon&destino=lat,lon` | Ruta (Google, OSRM o estimada) |
 | GET | `/api/cercano?lat=&lon=&tipo=albergue\|base` | Los 5 puntos más cercanos |
 | GET | `/api/albergues/publicos` | Lista pública mínima para `cerca.html` |
+| GET | `/api/escuelas?fenomeno=&mes=&nivel=&mun=&estado=&buscar=&riesgo=&limite=` | Escuelas con peligro, vulnerabilidad, índice y nivel de riesgo, `enPeligro` y `afectada`, en columnas como `/api/localidades`. `nivel` = nivel educativo; `mun` = clave o nombre; `estado` = `peligro`, `afectada`, `peligro_afectada` o `todas`; `riesgo` = niveles de riesgo separados por coma. 409 con aviso si no hay escuelas |
+| GET | `/api/escuelas/resumen?fenomeno=&mes=` | Total, en peligro, afectadas, alumnos expuestos (`null` y aviso si el catálogo no trae alumnos) y desglose por municipio, nivel educativo y nivel de riesgo |
+| GET | `/api/escuela/:cct?fenomeno=&mes=` | Ficha: datos, localidad del censo más cercana y su distancia, riesgo con los cuatro fenómenos, población en 2 km, albergue más cercano, reportes e historial (también acepta `DENUE-<id>`) |
 | POST | `/api/lora/trama` | Trama de un nodo ESP32 |
 | GET/POST/DELETE | `/api/confirmaciones` | Albergues, bases y reportes |
 | GET | `/api/tabulador?buscar=&capitulo=&tipo=` | Conceptos del tabulador filtrados (409 con aviso si falta el CSV) |

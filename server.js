@@ -19,7 +19,8 @@ import { leerTabulador, filtrarTabulador, resumenTabulador, CAPITULOS, TIPOS_DAT
 import { calcularPresupuesto, cargarPlanteles, ErrorPresupuesto } from './lib/presupuesto.js';
 import { armarGuardado, compararConTabulador, resumenGuardado, presupuestoACSV, nombreArchivoCSV, paraRecursosCapcee } from './lib/presupuestos.js';
 import { crearAlmacenJSON } from './lib/almacen.js';
-import { cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA } from './lib/escuelas.js';
+import { cargarEscuelasDesdeCarpeta, marcaCarpeta, LIMITES_PUEBLA, NIVELES_ESCOLARES } from './lib/escuelas.js';
+import { prepararEscuelas, riesgoEscuela, riesgoPorFenomeno, enPeligro, filtrarEscuelas, resumenEscuelas } from './lib/riesgo-escuelas.js';
 import { crearSesiones, esPublico, claveIgual, leerCookie, cookieSesion, COOKIE } from './lib/sesion.js';
 import {
   validarCSV, compararTabuladores, reemplazarTabulador, listarHistorial, claveCorrecta, RE_RESPALDO, LIMITE_BYTES,
@@ -173,6 +174,80 @@ function estadoEscuelas() {
     cargadas: d.escuelas.length > 0, total: d.escuelas.length, resumen: d.resumen, errores: d.errores,
     descartes: d.descartes.slice(0, 50), limites: LIMITES_PUEBLA,
     aviso: d.escuelas.length ? null : `Ningún renglón de data/escuelas/ se pudo usar. ${d.errores.join(' ')}`.trim(),
+  };
+}
+
+// ---------- Riesgo por escuela (lib/riesgo-escuelas.js) ----------
+// Lo que no depende del fenómeno ni del mes (localidad más cercana, sismicidad en el punto, celda
+// climática) se prepara una vez y se rehace solo si cambian las escuelas, el censo, los sismos o el clima.
+let escPrep = { claves: null, puntos: null };
+function puntosEscuelas() {
+  const d = escuelas();
+  const claves = [d, estado.iter, estado.sismoInfo, estado.clima];
+  if (!escPrep.claves || claves.some((c, i) => c !== escPrep.claves[i])) {
+    escPrep = {
+      claves,
+      puntos: d && estado.iter ? prepararEscuelas(d.escuelas, estado.iter.localidades, {
+        sismos: estado.sismos?.eventos, sismoInfo: estado.sismoInfo, malla: estado.clima?.celdas,
+      }) : null,
+    };
+    escFilas.clear();
+  }
+  return escPrep.puntos;
+}
+// Escuelas afectadas por id (reporte de daño leve o mayor). Se llena en el paso 3 con los reportes.
+const afectadasPorId = () => new Map();
+// Filas con riesgo y estado para un fenómeno y mes (se guardan las últimas combinaciones pedidas).
+const escFilas = new Map();
+function filasEscuelas(fenomeno, mes) {
+  const puntos = puntosEscuelas();
+  if (!puntos) return null;
+  const k = `${fenomeno}-${mes}`;
+  if (!escFilas.has(k)) {
+    if (escFilas.size > 24) escFilas.clear();
+    const afectadas = afectadasPorId();
+    escFilas.set(k, puntos.map((pt) => {
+      const riesgo = riesgoEscuela(pt, fenomeno, mes, estado.maximos);
+      return { ...pt, riesgo, enPeligro: enPeligro(riesgo.nivel), afectada: afectadas.has(pt.e.id), dano: afectadas.get(pt.e.id) || null };
+    }));
+  }
+  return escFilas.get(k);
+}
+const requiereEscuelas = (res) => {
+  if (requiereITER(res)) return true;
+  if (escuelas()?.escuelas.length) return false;
+  enviar(res, 409, { error: 'No hay escuelas cargadas.', ayuda: estadoEscuelas().aviso });
+  return true;
+};
+const COLUMNAS_ESCUELAS = ['id', 'cct', 'nombre', 'nivel', 'tipo_ct', 'es_inmueble_escolar', 'municipio', 'mun', 'localidad', 'lat', 'lon', 'alumnos',
+  'ubicacion_aproximada', 'P', 'V', 'R', 'riesgo', 'enPeligro', 'afectada', 'distLocKm'];
+const filaEscuela = (f) => [f.e.id, f.e.cct, f.e.nombre, f.e.nivel, f.e.tipo_ct, f.e.es_inmueble_escolar, f.e.municipio, f.mun, f.e.localidad,
+  f.e.lat, f.e.lon, f.e.alumnos, f.e.ubicacion_aproximada, f.riesgo.p, f.riesgo.V, f.riesgo.r, f.riesgo.nivel, f.enPeligro, f.afectada, f.distLocKm];
+
+function fichaEscuela(id, fenomeno, mes) {
+  const filas = filasEscuelas(fenomeno, mes);
+  const clave = String(id).trim().toUpperCase();
+  const f = filas.find((x) => x.e.id.toUpperCase() === clave || x.e.cct === clave);
+  if (!f) return null;
+  // Población en 2 km: localidades del censo cuyo punto cae dentro del círculo.
+  const g = validarGeocerca({ tipo: 'circulo', centro: [f.lat, f.lon], radioKm: 2 });
+  const cerca = estado.iter.localidades.filter((l) => Math.abs(l.lat - f.lat) < 0.03 && Math.abs(l.lon - f.lon) < 0.03 && contiene(g, l.lat, l.lon));
+  const albergues = leerConfirmaciones().filter((c) => c.tipo === 'albergue')
+    .map((c) => ({ id: c.id, nombre: c.nombre, lat: c.lat, lon: c.lon, personas: c.personas, capacidad: c.capacidad, distanciaKm: Math.round(distanciaKm(f.lat, f.lon, c.lat, c.lon) * 10) / 10 }))
+    .sort((a, b) => a.distanciaKm - b.distanciaKm);
+  return {
+    escuela: f.e,
+    mun: f.mun,
+    localidadCercana: f.loc ? { id: f.loc.id, nom: f.loc.nom, nomMun: f.loc.nomMun, distanciaKm: f.distLocKm, V: f.loc.V, POBTOT: f.loc.POBTOT } : null,
+    fenomeno, mes,
+    riesgo: f.riesgo,
+    enPeligro: f.enPeligro,
+    afectada: f.afectada,
+    riesgoPorFenomeno: riesgoPorFenomeno(f, mes, estado.maximos),
+    poblacion2km: { radioKm: 2, ...agregar(cerca), nota: 'Suma las localidades del censo cuyo punto está a 2 km o menos de la escuela.' },
+    albergueCercano: albergues[0] || null,
+    reportes: [], // paso 3
+    historial: [], // paso 3
   };
 }
 
@@ -650,6 +725,34 @@ async function api(req, res, url) {
       return enviar(res, 200, paraRecursosCapcee(marcado));
     }
     return enviar(res, 405, { error: 'Método no permitido' });
+  }
+
+  // ---------- Escuelas ----------
+  if (ruta === '/api/escuelas' && req.method === 'GET') {
+    if (requiereEscuelas(res)) return;
+    const estadoQ = ['peligro', 'afectada', 'todas', 'peligro_afectada'].includes(q.get('estado')) ? q.get('estado') : 'todas';
+    const filtros = {
+      nivel: NIVELES_ESCOLARES.includes(q.get('nivel')) ? q.get('nivel') : '',
+      mun: (q.get('mun') || '').slice(0, 80),
+      estado: estadoQ,
+      buscar: (q.get('buscar') || '').slice(0, 100),
+      riesgo: (q.get('riesgo') || '').split(',').filter((n) => NIVELES.some((x) => x.id === n) || n === 'sin_dato'),
+    };
+    const lista = filtrarEscuelas(filasEscuelas(fenomeno, mes), filtros);
+    const limite = Math.max(0, Math.round(num(q.get('limite'), 0)));
+    return enviar(res, 200, {
+      fenomeno, mes, filtros, total: lista.length, columnas: COLUMNAS_ESCUELAS,
+      datos: (limite ? lista.slice(0, limite) : lista).map(filaEscuela),
+    });
+  }
+  if (ruta === '/api/escuelas/resumen' && req.method === 'GET') {
+    if (requiereEscuelas(res)) return;
+    return enviar(res, 200, { fenomeno, mes, ...resumenEscuelas(filasEscuelas(fenomeno, mes)) });
+  }
+  if (ruta.startsWith('/api/escuela/') && req.method === 'GET') {
+    if (requiereEscuelas(res)) return;
+    const f = fichaEscuela(decodeURIComponent(ruta.slice('/api/escuela/'.length)), fenomeno, mes);
+    return f ? enviar(res, 200, f) : enviar(res, 404, { error: 'Escuela no encontrada' });
   }
 
   if (ruta === '/api/preparar/clima' && req.method === 'POST') {
